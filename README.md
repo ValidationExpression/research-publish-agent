@@ -247,4 +247,9 @@ deep-research-agemt/
 
 ## License
 
-待定。上游 Wechatsync 组件请遵循其原有许可证。
+本项目采用 [GNU General Public License v3.0](LICENSE)（GPL-3.0）。
+
+- `packages/core`、`packages/local-server`、`packages/cookie-provider` 源自 [Wechatsync](https://github.com/wechatsync/Wechatsync)（GPL-3.0）
+- `packages/research-agent` 参考 [deepagents](https://github.com/langchain-ai/deepagents) 示例（MIT，详见 [NOTICE](NOTICE)）
+
+完整版权声明与上游归属见 [NOTICE](NOTICE)。
