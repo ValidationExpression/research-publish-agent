@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "InkFlow · 登录态助手",
+  "description": "仅向本地 InkFlow（墨流）服务供给各平台登录态 Cookie（不执行发稿逻辑）",
+  "version": "0.1.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Wechatsync Cookie Provider"
+  },
+  "permissions": ["cookies", "storage", "tabs", "alarms"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

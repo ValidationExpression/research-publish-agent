@@ -1,0 +1,17 @@
+{
+  "name": "@wechatsync/cookie-provider",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "InkFlow（墨流）登录态供给插件（仅提供 Cookie，不发稿）",
+  "scripts": {
+    "build": "tsup && node scripts/copy-assets.mjs",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.254",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@deep-research/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "深度搜索 + 多平台发布桌面端",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "pnpm build:main && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env NODE_ENV=development electron .\"",
+    "build:main": "tsup",
+    "build:renderer": "vite build",
+    "build": "pnpm build:main && pnpm build:renderer",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wechatsync/local-server": "workspace:*",
+    "marked": "^17.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.1"
+  }
+}

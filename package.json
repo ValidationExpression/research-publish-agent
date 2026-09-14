@@ -1,0 +1,25 @@
+{
+  "name": "deep-research-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "深度搜索 + 多平台发布桌面端",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" run build",
+    "build:core": "pnpm --filter @wechatsync/core build",
+    "build:server": "pnpm --filter @wechatsync/local-server build",
+    "build:provider": "pnpm --filter @wechatsync/cookie-provider build",
+    "build:desktop": "pnpm --filter @deep-research/desktop build",
+    "server": "pnpm --filter @wechatsync/local-server start",
+    "server:smoke": "pnpm --filter @wechatsync/local-server smoke",
+    "test:sync": "node scripts/test-sync.mjs",
+    "desktop:dev": "pnpm --filter @deep-research/desktop dev",
+    "research:dev": "cd packages/research-agent && uv run python -m research_agent.server",
+    "typecheck": "pnpm -r --filter \"./packages/{core,local-server,desktop}\" run typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "electron"]
+  }
+}
