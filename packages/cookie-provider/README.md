@@ -1,6 +1,6 @@
-# Cookie Provider 插件（InkFlow 登录态助手）
+# Cookie Provider 插件（Research Publish Agent 登录态助手）
 
-墨流 InkFlow 的「登录态供给」轻量 Chrome 插件：**只读取你已登录平台的 Cookie 并经 WebSocket 提供给本地服务，不执行任何发稿逻辑**。
+Research Publish Agent 的「登录态供给」轻量 Chrome 插件：**只读取你已登录平台的 Cookie 并经 WebSocket 提供给本地服务，不执行任何发稿逻辑**。
 
 ## 构建
 

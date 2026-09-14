@@ -1,6 +1,6 @@
-# Deep Research Agent
+# Research Publish Agent
 
-**深度搜索 + 多平台发布桌面端** — 用 AI 做深度研究，审阅后一键同步草稿到 CSDN、微信公众号等平台。
+**AI 深度研究 + 人工审阅 + 多平台草稿发布** — 用 AI 做深度研究，审阅后一键同步草稿到 CSDN、微信公众号等平台。
 
 > 研究（Python / LangGraph）与发稿（Node / 浏览器 Cookie）分离编排，桌面端统一调度。Cookie 不出本机，报告必须人工审阅后才可发布。
 
@@ -87,8 +87,8 @@ flowchart TB
 ### 安装
 
 ```bash
-git clone <your-repo-url>
-cd deep-research-agemt
+git clone https://github.com/ValidationExpression/research-publish-agent.git
+cd research-publish-agent
 
 pnpm install
 pnpm build
@@ -178,7 +178,7 @@ CSDN · 微信公众号 · 知乎 · 掘金 · 简书 · 博客园 · 开源中�
 ## 项目结构
 
 ```
-deep-research-agemt/
+research-publish-agent/
 ├── packages/
 │   ├── desktop/           # Electron 桌面端 + React UI
 │   ├── research-agent/    # Python 研究 Agent + FastAPI

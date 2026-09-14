@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "InkFlow · 登录态助手",
-  "description": "仅向本地 InkFlow（墨流）服务供给各平台登录态 Cookie（不执行发稿逻辑）",
+  "name": "Research Publish Agent · 登录态助手",
+  "description": "仅向本地 Research Publish Agent 服务供给各平台登录态 Cookie（不执行发稿逻辑）",
   "version": "0.1.0",
   "action": {
     "default_popup": "popup.html",

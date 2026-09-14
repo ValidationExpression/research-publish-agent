@@ -1,6 +1,6 @@
 # 本地发稿服务 (local-server)
 
-墨流 InkFlow 的「本地大脑」：实现 Node 版 `RuntimeInterface`，原样复用 `@wechatsync/core` 的 23 个平台适配器，对外暴露 REST API，配合独立的 **Cookie Provider 插件**完成多平台发文。
+Research Publish Agent 的「本地大脑」：实现 Node 版 `RuntimeInterface`，原样复用 `@wechatsync/core` 的 23 个平台适配器，对外暴露 REST API，配合独立的 **Cookie Provider 插件**完成多平台发文。
 
 ## 架构
 

@@ -41,7 +41,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Deep Research Agent</h1>
+        <h1>Research Publish Agent</h1>
         <div className="status-bar">
           <span className={`pill ${publishConnected ? 'ok' : 'bad'}`}>
             Cookie 插件 {publishConnected ? '已连接' : '未连接'}

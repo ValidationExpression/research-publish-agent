@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "InkFlow（墨流）登录态供给插件（仅提供 Cookie，不发稿）",
+  "description": "Research Publish Agent 登录态供给插件（仅提供 Cookie，不发稿）",
   "scripts": {
     "build": "tsup && node scripts/copy-assets.mjs",
     "dev": "tsup --watch",
