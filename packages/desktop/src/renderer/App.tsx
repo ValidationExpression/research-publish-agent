@@ -4,7 +4,7 @@ import { ReviewPage } from './pages/ReviewPage'
 import { PublishPage } from './pages/PublishPage'
 import { PageHeader } from './components/PageHeader'
 import { WorkflowSidebar } from './components/WorkflowSidebar'
-import type { AppStep, WorkflowArticle } from './workflow'
+import type { AppStep, ServiceRequestPhase, WorkflowArticle } from './workflow'
 
 export type { AppStep } from './workflow'
 
@@ -32,10 +32,14 @@ export default function App() {
   const [step, setStep] = useState<AppStep>('research')
   const [publishConnected, setPublishConnected] = useState(false)
   const [researchOk, setResearchOk] = useState(false)
+  const [serviceStatusPhase, setServiceStatusPhase] = useState<ServiceRequestPhase>('loading')
+  const [hasResolvedServiceStatus, setHasResolvedServiceStatus] = useState(false)
+  const [serviceStatusError, setServiceStatusError] = useState<string | null>(null)
   const [config, setConfig] = useState<{ publishToken: string } | null>(null)
   const [article, setArticle] = useState<ArticleDraft>({ title: '', markdown: '' })
 
   const refreshStatus = useCallback(async () => {
+    setServiceStatusPhase('loading')
     try {
       const status = await window.desktopApi.getServiceStatus() as {
         publish?: { connected?: boolean }
@@ -43,7 +47,12 @@ export default function App() {
       }
       setPublishConnected(!!status.publish?.connected)
       setResearchOk(!!status.research?.ok)
-    } catch {
+      setHasResolvedServiceStatus(true)
+      setServiceStatusPhase('success')
+      setServiceStatusError(null)
+    } catch (error) {
+      setServiceStatusPhase('error')
+      setServiceStatusError(error instanceof Error ? error.message : '服务状态刷新失败')
       // Keep the prior status visible while a refresh is unavailable.
     }
   }, [])
@@ -80,6 +89,9 @@ export default function App() {
           article={article}
           publishConnected={publishConnected}
           researchOk={researchOk}
+          serviceStatusPhase={serviceStatusPhase}
+          hasResolvedServiceStatus={hasResolvedServiceStatus}
+          serviceStatusError={serviceStatusError}
           onStepChange={setStep}
         />
 
@@ -87,7 +99,7 @@ export default function App() {
         <PageHeader {...PAGE_META[step]} />
 
         <main className="content">
-          {!publishConnected && (
+          {hasResolvedServiceStatus && !publishConnected && (
             <div className="onboarding-banner" role="status">
               <div>
                 <strong>首次使用</strong>

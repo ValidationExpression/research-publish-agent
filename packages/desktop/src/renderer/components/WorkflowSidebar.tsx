@@ -1,5 +1,5 @@
-import type { AppStep, WorkflowArticle } from '../workflow'
-import { getWorkflowSteps } from '../workflow'
+import type { AppStep, ServiceRequestPhase, WorkflowArticle } from '../workflow'
+import { getServiceStatusView, getWorkflowSteps } from '../workflow'
 import { IconCpu, IconLock, IconPlug, IconPublish, IconResearch, IconReview } from './Icons'
 
 export interface WorkflowSidebarProps {
@@ -7,6 +7,9 @@ export interface WorkflowSidebarProps {
   article: WorkflowArticle
   publishConnected: boolean
   researchOk: boolean
+  serviceStatusPhase: ServiceRequestPhase
+  hasResolvedServiceStatus: boolean
+  serviceStatusError: string | null
   onStepChange: (step: AppStep) => void
 }
 
@@ -26,9 +29,24 @@ export function WorkflowSidebar({
   article,
   publishConnected,
   researchOk,
+  serviceStatusPhase,
+  hasResolvedServiceStatus,
+  serviceStatusError,
   onStepChange,
 }: WorkflowSidebarProps) {
   const steps = getWorkflowSteps(currentStep, article)
+  const publishStatus = getServiceStatusView(
+    'publish',
+    serviceStatusPhase,
+    publishConnected,
+    hasResolvedServiceStatus,
+  )
+  const researchStatus = getServiceStatusView(
+    'research',
+    serviceStatusPhase,
+    researchOk,
+    hasResolvedServiceStatus,
+  )
 
   return (
     <aside className="sidebar">
@@ -78,16 +96,21 @@ export function WorkflowSidebar({
       <div className="sidebar-status" aria-label="服务状态">
         <div className="status-row">
           <span className="status-label"><IconPlug /> Cookie 插件</span>
-          <span className={`status-chip ${publishConnected ? 'ok' : 'bad'}`}>
-            {publishConnected ? '已连接' : '未连接'}
+          <span className={`status-chip ${publishStatus.state === 'healthy' ? 'ok' : 'bad'}`}>
+            {publishStatus.label}
           </span>
         </div>
         <div className="status-row">
           <span className="status-label"><IconCpu /> 研究服务</span>
-          <span className={`status-chip ${researchOk ? 'ok' : 'bad'}`}>
-            {researchOk ? '运行中' : '未就绪'}
+          <span className={`status-chip ${researchStatus.state === 'healthy' ? 'ok' : 'bad'}`}>
+            {researchStatus.label}
           </span>
         </div>
+        {serviceStatusError && (
+          <p role="status">
+            {hasResolvedServiceStatus ? '状态刷新失败，已保留上次检查结果。' : '服务状态检查失败，请稍后重试。'}
+          </p>
+        )}
       </div>
     </aside>
   )
