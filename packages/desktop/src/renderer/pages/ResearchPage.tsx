@@ -1,7 +1,7 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import type { ArticleDraft } from '../App'
 import { IconArrowRight, IconGlobe, IconLayers, IconReport } from '../components/Icons'
-import { RESEARCH_SUGGESTIONS, canStartResearch, classifyResearchLog } from '../research-view-model'
+import { RESEARCH_SUGGESTIONS, canStartResearch, classifyResearchLog, getResearchLogMessage } from '../research-view-model'
 
 interface Props {
   onComplete: (draft: ArticleDraft) => void
@@ -50,40 +50,53 @@ export function ResearchPage({ onComplete }: Props) {
     if (el) el.scrollTop = el.scrollHeight
   }, [logs])
 
+  function stopResearchWithError(message: string) {
+    setLogs((prev) => [...prev, `[error] ${message}`])
+    setRunning(false)
+  }
+
   async function loadReport(id: string): Promise<boolean> {
-    const res = await window.desktopApi.researchFetch(`/research/${id}/report`)
-    if (res.ok && res.data && typeof res.data === 'object') {
-      const data = res.data as { title: string; markdown: string }
-      if ((data.markdown || '').trim()) {
-        doneRef.current = true
-        setRunning(false)
-        onComplete({ title: data.title, markdown: data.markdown })
-        return true
+    try {
+      const res = await window.desktopApi.researchFetch(`/research/${id}/report`)
+      if (res.ok && res.data && typeof res.data === 'object') {
+        const data = res.data as { title: string; markdown: string }
+        if ((data.markdown || '').trim()) {
+          doneRef.current = true
+          setRunning(false)
+          onComplete({ title: data.title, markdown: data.markdown })
+          return true
+        }
       }
+    } catch {
+      stopResearchWithError('加载研究报告失败，请稍后重试')
+      return true
     }
     return false
   }
 
   async function pollUntilDone(id: string) {
-    for (let i = 0; i < 30; i++) {
-      if (doneRef.current) return
-      const statusRes = await window.desktopApi.researchFetch(`/research/${id}/status`)
-      if (statusRes.ok && statusRes.data && typeof statusRes.data === 'object') {
-        const status = statusRes.data as { status: string; error?: string; hasReport?: boolean }
-        if (status.status === 'failed') {
-          setLogs((prev) => [...prev, `[error] ${status.error || '研究失败'}`])
-          setRunning(false)
-          return
+    try {
+      for (let i = 0; i < 30; i++) {
+        if (doneRef.current) return
+        const statusRes = await window.desktopApi.researchFetch(`/research/${id}/status`)
+        if (statusRes.ok && statusRes.data && typeof statusRes.data === 'object') {
+          const status = statusRes.data as { status: string; error?: string; hasReport?: boolean }
+          if (status.status === 'failed') {
+            stopResearchWithError(status.error || '研究失败')
+            return
+          }
+          if (status.status === 'completed' || status.hasReport) {
+            const ok = await loadReport(id)
+            if (ok) return
+          }
         }
-        if (status.status === 'completed' || status.hasReport) {
-          const ok = await loadReport(id)
-          if (ok) return
-        }
+        await new Promise((r) => setTimeout(r, 2000))
       }
-      await new Promise((r) => setTimeout(r, 2000))
+    } catch {
+      stopResearchWithError('检查研究状态失败，请稍后重试')
+      return
     }
-    setLogs((prev) => [...prev, '[error] 等待报告超时，请稍后重试'])
-    setRunning(false)
+    stopResearchWithError('等待报告超时，请稍后重试')
   }
 
   async function startResearch() {
@@ -91,19 +104,29 @@ export function ResearchPage({ onComplete }: Props) {
     setRunning(true)
     setLogs([])
     doneRef.current = false
-    const res = await window.desktopApi.researchFetch('/research', {
-      method: 'POST',
-      body: JSON.stringify({ topic: topic.trim() }),
-    })
+    let res: Awaited<ReturnType<typeof window.desktopApi.researchFetch>>
+    try {
+      res = await window.desktopApi.researchFetch('/research', {
+        method: 'POST',
+        body: JSON.stringify({ topic: topic.trim() }),
+      })
+    } catch {
+      stopResearchWithError('启动研究时发生错误，请重试')
+      return
+    }
     if (!res.ok || !res.data || typeof res.data !== 'object') {
-      setLogs(['[error] 启动研究失败'])
-      setRunning(false)
+      stopResearchWithError('启动研究失败')
       return
     }
     const id = (res.data as { jobId: string }).jobId
     jobIdRef.current = id
     setLogs([`任务已创建: ${id}`])
-    void window.desktopApi.startResearchSse(id)
+    try {
+      await window.desktopApi.startResearchSse(id)
+    } catch {
+      setLogs((prev) => [...prev, '[error] 实时进度连接失败，正在检查研究状态'])
+      void pollUntilDone(id)
+    }
   }
 
   function onSubmit(e: FormEvent) {
@@ -182,7 +205,7 @@ export function ResearchPage({ onComplete }: Props) {
             {logs.map((line, i) => (
               <li key={i} className={`research-timeline-row is-${classifyResearchLog(line)}`}>
                 <span className="research-timeline-marker" aria-hidden="true" />
-                <span>{line}</span>
+                <span>{getResearchLogMessage(line)}</span>
               </li>
             ))}
           </ol>

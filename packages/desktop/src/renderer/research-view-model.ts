@@ -14,3 +14,7 @@ export function classifyResearchLog(line: string): 'default' | 'progress' | 'don
   if (line.includes('[progress]')) return 'progress'
   return 'default'
 }
+
+export function getResearchLogMessage(line: string): string {
+  return line.replace(/^\[(?:error|done|progress)\]\s*/, '')
+}
