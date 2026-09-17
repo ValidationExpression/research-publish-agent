@@ -79,9 +79,9 @@ export class NodeRuntime implements RuntimeInterface {
   clearCookies(): void {
     this.cookieMap.clear()
   }
-  /** 是否已持有某域名的 Cookie */
+  /** 是否已持有某域名（含子域后缀匹配）的 Cookie */
   hasCookie(domain: string): boolean {
-    return this.cookieMap.has(domain)
+    return !!matchCookie(this.cookieMap, domain)
   }
   /** 已持有的 Cookie 域名清单（供状态查询） */
   cookieDomains(): string[] {

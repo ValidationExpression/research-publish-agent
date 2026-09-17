@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import type { PublishRuntime } from '@wechatsync/local-server/publish-runtime'
+import { loadRootEnv } from './load-root-env'
 import { loadConfig, type AppConfig } from './config'
 import { startResearchSidecar, stopResearchSidecar } from './research-sidecar'
 
@@ -40,6 +41,7 @@ async function startServices(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  loadRootEnv()
   await startServices()
   createWindow()
 })
@@ -104,6 +106,19 @@ ipcMain.handle('research-fetch', async (_evt, pathAndQuery: string, init?: { met
   }
 })
 
+function flushSseBuffer(
+  event: IpcMainInvokeEvent,
+  jobId: string,
+  buffer: string,
+): void {
+  for (const part of buffer.split('\n\n')) {
+    const line = part.split('\n').find((l) => l.startsWith('data: '))
+    if (!line) continue
+    const payload = JSON.parse(line.slice(6))
+    event.sender.send('research-sse-event', { jobId, ...payload })
+  }
+}
+
 ipcMain.handle('research-sse', async (event, jobId: string) => {
   const url = `http://127.0.0.1:${config.researchHttpPort}/research/${jobId}/events?token=${config.researchToken}`
   const res = await fetch(url)
@@ -117,16 +132,22 @@ ipcMain.handle('research-sse', async (event, jobId: string) => {
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const parts = buffer.split('\n\n')
-      buffer = parts.pop() || ''
-      for (const part of parts) {
-        const line = part.split('\n').find((l) => l.startsWith('data: '))
-        if (line) {
-          const payload = JSON.parse(line.slice(6))
-          event.sender.send('research-sse-event', { jobId, ...payload })
+      if (value) {
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() || ''
+        for (const part of parts) {
+          const line = part.split('\n').find((l) => l.startsWith('data: '))
+          if (line) {
+            const payload = JSON.parse(line.slice(6))
+            event.sender.send('research-sse-event', { jobId, ...payload })
+          }
         }
+      }
+      if (done) {
+        if (buffer.trim()) flushSseBuffer(event, jobId, buffer)
+        event.sender.send('research-sse-end', { jobId })
+        break
       }
     }
   } catch (e) {

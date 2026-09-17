@@ -34,7 +34,11 @@ export function PublishPage({ article }: Props) {
     const res = await window.desktopApi.publishFetch('/platforms')
     if (res.ok && res.data && typeof res.data === 'object') {
       const list = (res.data as { platforms: Platform[] }).platforms
-      setPlatforms(list)
+      const sorted = [...list].sort((a, b) => {
+        if (a.loggedIn !== b.loggedIn) return a.loggedIn ? -1 : 1
+        return a.name.localeCompare(b.name, 'zh-CN')
+      })
+      setPlatforms(sorted)
     }
   }
 
@@ -90,14 +94,26 @@ export function PublishPage({ article }: Props) {
     setPublishing(false)
   }
 
-  const common = platforms.filter((p) => ['csdn', 'weixin', 'zhihu', 'juejin'].includes(p.id))
+  const loggedInCount = platforms.filter((p) => p.loggedIn).length
 
   return (
     <div className="card">
       <h2>发布到平台（草稿）</h2>
       <p style={{ fontSize: 13, color: '#9ca3af' }}>标题：{article.title}</p>
-      <div className="platform-list" style={{ marginTop: 12 }}>
-        {(common.length ? common : platforms.slice(0, 12)).map((p) => (
+      <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+        共 {platforms.length} 个平台，{loggedInCount} 个已登录
+        {platforms.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void loadPlatforms()}
+            style={{ marginLeft: 8, fontSize: 12, padding: '2px 8px' }}
+          >
+            刷新登录态
+          </button>
+        )}
+      </p>
+      <div className="platform-list" style={{ marginTop: 12, maxHeight: 360, overflowY: 'auto' }}>
+        {platforms.map((p) => (
           <label key={p.id} className="platform-item">
             <input
               type="checkbox"

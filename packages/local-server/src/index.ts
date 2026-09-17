@@ -1,7 +1,10 @@
 /**
  * CLI entry: start publish runtime from environment variables.
  */
+import { loadRootEnv } from './load-root-env'
 import { startPublishRuntime } from './publish-runtime'
+
+loadRootEnv()
 
 const TOKEN = process.env.WECHATSYNC_TOKEN || ''
 

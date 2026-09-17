@@ -3,29 +3,416 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Research Publish Agent · 登录态助手</title>
+    <title>InkFlow · 登录态助手</title>
     <style>
-      body { font-family: system-ui, sans-serif; width: 280px; padding: 12px 16px; margin: 0; color: #222; }
-      h2 { font-size: 15px; margin: 0 0 12px; }
-      label { display: block; font-size: 12px; margin: 8px 0 4px; color: #555; }
-      input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
-      button { margin-top: 12px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-size: 14px; cursor: pointer; }
-      button:hover { background: #1d4ed8; }
-      #status { margin-top: 12px; font-size: 13px; font-weight: 600; }
-      #saved { color: #16a34a; font-size: 12px; min-height: 14px; }
-      .hint { font-size: 11px; color: #999; margin-top: 10px; line-height: 1.5; }
+      :root {
+        --color-primary: #1e3a5f;
+        --color-on-primary: #ffffff;
+        --color-secondary: #2563eb;
+        --color-accent: #059669;
+        --color-background: #f8fafc;
+        --color-surface: #ffffff;
+        --color-foreground: #0f172a;
+        --color-muted: #475569;
+        --color-muted-bg: #f1f3f5;
+        --color-border: #e4e7eb;
+        --color-ring: #1e3a5f;
+        --color-warning: #d97706;
+        --color-danger: #dc2626;
+        --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+        --radius: 10px;
+        --space: 8px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-primary: #93c5fd;
+          --color-on-primary: #0f172a;
+          --color-secondary: #60a5fa;
+          --color-accent: #34d399;
+          --color-background: #0f172a;
+          --color-surface: #1e293b;
+          --color-foreground: #f8fafc;
+          --color-muted: #94a3b8;
+          --color-muted-bg: #1e293b;
+          --color-border: #334155;
+          --color-ring: #93c5fd;
+          --color-warning: #fbbf24;
+          --color-danger: #f87171;
+          --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+        }
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        color-scheme: light dark;
+        background: var(--color-background);
+      }
+
+      body {
+        width: 360px;
+        margin: 0;
+        padding: 16px;
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+        color: var(--color-foreground);
+        background: var(--color-background);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .logo {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: #1e3a5f;
+        color: #fff;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .logo { background: #2563eb; }
+      }
+
+      .logo svg { width: 20px; height: 20px; }
+
+      h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        margin: 2px 0 0;
+        font-size: 12px;
+        color: var(--color-muted);
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        background: var(--color-muted-bg);
+        color: var(--color-muted);
+        border: 1px solid var(--color-border);
+      }
+
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .status.is-connected {
+        color: #047857;
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+      }
+
+      .status.is-connecting {
+        color: #b45309;
+        background: #fffbeb;
+        border-color: #fde68a;
+      }
+
+      .status.is-disconnected {
+        color: #b91c1c;
+        background: #fef2f2;
+        border-color: #fecaca;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .status.is-connected {
+          color: #6ee7b7;
+          background: rgb(5 150 105 / 0.16);
+          border-color: rgb(52 211 153 / 0.28);
+        }
+        .status.is-connecting {
+          color: #fcd34d;
+          background: rgb(217 119 6 / 0.16);
+          border-color: rgb(251 191 36 / 0.28);
+        }
+        .status.is-disconnected {
+          color: #fca5a5;
+          background: rgb(220 38 38 / 0.16);
+          border-color: rgb(248 113 113 / 0.28);
+        }
+      }
+
+      .status.is-connecting .status-dot {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      .form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .field { display: flex; flex-direction: column; gap: 6px; }
+
+      label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--color-foreground);
+      }
+
+      .input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .input-icon {
+        position: absolute;
+        left: 11px;
+        width: 16px;
+        height: 16px;
+        color: var(--color-muted);
+        pointer-events: none;
+      }
+
+      input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px 0 34px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        background: var(--color-surface);
+        color: var(--color-foreground);
+        font-size: 13px;
+        font-family: inherit;
+        box-shadow: var(--shadow-sm);
+        outline: none;
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+      }
+
+      #token { padding-right: 40px; }
+
+      input::placeholder { color: #94a3b8; }
+
+      input:hover { border-color: #cbd5e1; }
+
+      input:focus-visible {
+        border-color: var(--color-ring);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 22%, transparent);
+      }
+
+      .icon-btn {
+        position: absolute;
+        right: 4px;
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--color-muted);
+        cursor: pointer;
+      }
+
+      .icon-btn:hover { background: var(--color-muted-bg); color: var(--color-foreground); }
+
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--color-ring);
+        outline-offset: 1px;
+      }
+
+      .icon-btn svg { width: 16px; height: 16px; }
+      .icon-btn .icon-eye-off { display: none; }
+      .icon-btn[aria-pressed="true"] .icon-eye { display: none; }
+      .icon-btn[aria-pressed="true"] .icon-eye-off { display: block; }
+
+      .field-hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: var(--color-muted);
+      }
+
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        height: 40px;
+        margin-top: 4px;
+        border: 0;
+        border-radius: var(--radius);
+        background: #1e3a5f;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 160ms ease, transform 120ms ease;
+      }
+
+      .cta:hover { background: #163150; }
+      .cta:active { transform: translateY(1px); }
+      .cta:disabled {
+        opacity: 0.72;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .cta:focus-visible {
+        outline: 2px solid var(--color-ring);
+        outline-offset: 2px;
+      }
+
+      .cta svg { width: 16px; height: 16px; }
+
+      @media (prefers-color-scheme: dark) {
+        .cta { background: #2563eb; color: #fff; }
+        .cta:hover { background: #1d4ed8; }
+      }
+
+      .feedback {
+        min-height: 20px;
+        margin: 0;
+        font-size: 12px;
+        line-height: 20px;
+        font-weight: 600;
+        color: var(--color-accent);
+      }
+
+      .hint {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 14px;
+        padding: 10px 12px;
+        border-radius: var(--radius);
+        background: var(--color-muted-bg);
+        border: 1px solid var(--color-border);
+        color: var(--color-muted);
+        font-size: 11px;
+        line-height: 1.55;
+      }
+
+      .hint svg {
+        flex-shrink: 0;
+        width: 14px;
+        height: 14px;
+        margin-top: 1px;
+        color: var(--color-accent);
+      }
+
+      .hint p { margin: 0; }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
   <body>
-    <h2>Research Publish Agent · 登录态助手</h2>
-    <label>本地服务地址</label>
-    <input id="serverUrl" value="ws://localhost:9527" />
-    <label>Token（与本地服务 WECHATSYNC_TOKEN 一致）</label>
-    <input id="token" type="password" placeholder="设置后本地服务需相同 Token" />
-    <button id="save">保存并重连</button>
-    <div id="status">状态：未知</div>
-    <div id="saved"></div>
-    <div class="hint">本插件仅通过 WebSocket 把你在浏览器已登录平台的 Cookie 提供给本地服务，不读取/上传任何文章内容，不执行发稿。</div>
+    <header class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.8s6.5 6.8 6.5 11.4a6.5 6.5 0 1 1-13 0C5.5 9.6 12 2.8 12 2.8z" />
+          </svg>
+        </div>
+        <div>
+          <h1>InkFlow</h1>
+          <p class="subtitle">登录态助手</p>
+        </div>
+      </div>
+      <div id="status" class="status is-unknown" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="statusLabel">未知</span>
+      </div>
+    </header>
+
+    <form id="form" class="form" autocomplete="off">
+      <div class="field">
+        <label for="serverUrl">本地服务地址</label>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3.2 12h17.6" />
+            <path d="M12 3c2.6 3.2 4 6 4 9s-1.4 5.8-4 9c-2.6-3.2-4-6-4-9s1.4-5.8 4-9z" />
+          </svg>
+          <input id="serverUrl" value="ws://localhost:9527" spellcheck="false" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="token">访问令牌</label>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+          </svg>
+          <input id="token" type="password" placeholder="与本地服务 Token 保持一致" />
+          <button type="button" id="toggleToken" class="icon-btn" aria-label="显示令牌" aria-pressed="false">
+            <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 3l18 18" />
+              <path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-1.2" />
+              <path d="M17.9 17.3C16.1 18.4 14.1 19 12 19c-6 0-9.5-7-9.5-7a16.8 16.8 0 0 1 5-5.2" />
+              <path d="M9.9 6.1A16 16 0 0 1 12 5c6 0 9.5 7 9.5 7a17.4 17.4 0 0 1-2.3 3.1" />
+            </svg>
+          </button>
+        </div>
+        <p class="field-hint">需与本地服务环境变量 WECHATSYNC_TOKEN 一致</p>
+      </div>
+
+      <button type="submit" id="save" class="cta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 12a8 8 0 0 1 13.5-5.8L20 8" />
+          <path d="M20 4v4h-4" />
+          <path d="M20 12a8 8 0 0 1-13.5 5.8L4 16" />
+          <path d="M4 20v-4h4" />
+        </svg>
+        <span id="saveLabel">保存并重连</span>
+      </button>
+      <p id="saved" class="feedback" role="status" aria-live="polite"></p>
+    </form>
+
+    <footer class="hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3.2 19.5 6.4v5.4c0 4.7-3.1 8-7.5 9.2C7.6 19.8 4.5 16.5 4.5 11.8V6.4L12 3.2z" />
+        <path d="m9 12 2.1 2.1L15.4 10" />
+      </svg>
+      <p>仅通过 WebSocket 把已登录平台的 Cookie 提供给本地服务，不读取文章内容，也不执行发稿。</p>
+    </footer>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

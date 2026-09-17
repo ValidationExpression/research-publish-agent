@@ -12,6 +12,7 @@ import { adapterRegistry, getAdapter, getPreprocessConfig } from '@wechatsync/co
 import { preprocessArticle } from './preprocess'
 import type { CookieBridge } from './ws-server'
 import type { NodeRuntime } from './runtime/node-runtime'
+import { extractHost, rootDomain } from './domains'
 
 export interface SyncResultItem {
   platform: string
@@ -29,35 +30,6 @@ interface SyncTask {
   results: SyncResultItem[]
   startTime: number
   endTime?: number
-}
-
-function extractHost(homepage?: string): string | null {
-  if (!homepage) return null
-  try {
-    return new URL(homepage).hostname
-  } catch {
-    return null
-  }
-}
-
-/**
- * 将完整 hostname 归一为根域（如 editor.csdn.net -> csdn.net）。
- * 原因：平台登录 Cookie 一般挂在父域（.csdn.net），插件端
- * chrome.cookies.getAll({domain}) 只返回该域及其子域的 Cookie，
- * 请求根域才能完整拿到；NodeRuntime.matchCookie 按后缀匹配，
- * 存根域后所有子域请求都能命中。
- */
-const SECOND_LEVEL_TLD_PARTS = ['com', 'org', 'net', 'gov', 'edu', 'co']
-function rootDomain(host: string): string {
-  const parts = host.split('.')
-  if (parts.length <= 2) return host
-  // 处理 com.cn / co.uk 等二级后缀：末段为 2 字母国别码且倒数第二段在列表内
-  const last = parts[parts.length - 1]
-  const second = parts[parts.length - 2]
-  if (last.length === 2 && SECOND_LEVEL_TLD_PARTS.includes(second)) {
-    return parts.slice(-3).join('.')
-  }
-  return parts.slice(-2).join('.')
 }
 
 function delay(ms: number): Promise<void> {

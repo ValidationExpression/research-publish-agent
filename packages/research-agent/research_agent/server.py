@@ -18,13 +18,23 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-load_dotenv()
+
+def _find_repo_root() -> Path:
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / "pnpm-workspace.yaml").exists():
+            return candidate
+    return Path(__file__).resolve().parents[3]
+
+
+load_dotenv(_find_repo_root() / ".env")
 
 DATA_DIR = Path(os.getenv("RESEARCH_DATA_DIR", Path(__file__).resolve().parent.parent / "data" / "jobs"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 RESEARCH_TOKEN = os.getenv("RESEARCH_TOKEN", "research-local")
 PORT = int(os.getenv("RESEARCH_HTTP_PORT", "8765"))
+JOB_TIMEOUT_SECONDS = int(os.getenv("RESEARCH_JOB_TIMEOUT", "0"))
+SEARCH_BUDGET = int(os.getenv("RESEARCH_SEARCH_BUDGET", "4"))
 
 
 class ResearchRequest(BaseModel):
@@ -64,8 +74,32 @@ def _emit(job: JobState, event_type: str, message: str) -> None:
         q.put_nowait(payload)
 
 
-def _extract_title_and_markdown(text: str, fallback_topic: str) -> tuple[str, str]:
-    md = text.strip()
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        for key in ("content", "text", "markdown", "data"):
+            inner = value.get(key)
+            if inner is None:
+                continue
+            if isinstance(inner, str):
+                return inner
+            nested = _as_text(inner)
+            if nested:
+                return nested
+        return ""
+    if isinstance(value, list):
+        parts = [_as_text(item) for item in value]
+        return "\n".join(part for part in parts if part)
+    return str(value)
+
+
+def _extract_title_and_markdown(text: Any, fallback_topic: str) -> tuple[str, str]:
+    md = _as_text(text).strip()
     if not md:
         return fallback_topic, f"# {fallback_topic}\n\n（研究生成失败，内容为空）"
     m = re.search(r"^#\s+(.+)$", md, re.MULTILINE)
@@ -73,9 +107,39 @@ def _extract_title_and_markdown(text: str, fallback_topic: str) -> tuple[str, st
     return title, md
 
 
+def _extract_report_from_result(result: Any) -> str:
+    if not isinstance(result, dict):
+        return _as_text(result).strip()
+
+    files = result.get("files")
+    if isinstance(files, dict):
+        for key in ("/final_report.md", "final_report.md"):
+            text = _as_text(files.get(key)).strip()
+            if text:
+                return text
+        for path, value in files.items():
+            if "final_report" in str(path).lower() or str(path).endswith(".md"):
+                text = _as_text(value).strip()
+                if len(text) > 200:
+                    return text
+
+    messages = result.get("messages") or []
+    for msg in reversed(messages):
+        content = getattr(msg, "content", None)
+        if content is None and isinstance(msg, dict):
+            content = msg.get("content")
+        text = _as_text(content).strip()
+        if text and ("#" in text or len(text) > 300):
+            return text
+    return ""
+
+
 async def _run_job(job: JobState) -> None:
     from research_agent.graph import create_research_agent
+    from research_agent.progress import bind_job, unbind_job
 
+    heartbeat: asyncio.Task | None = None
+    hooks = None
     try:
         _emit(job, "planning", "正在规划研究任务…")
         agent = create_research_agent()
@@ -84,35 +148,48 @@ async def _run_job(job: JobState) -> None:
             _emit(job, "error", "任务已取消")
             return
 
+        hooks = bind_job(
+            lambda event_type, message: _emit(job, event_type, message),
+            lambda: job.cancel_flag,
+            budget=SEARCH_BUDGET,
+        )
+
+        async def _heartbeat() -> None:
+            elapsed = 0
+            while True:
+                await asyncio.sleep(15)
+                elapsed += 15
+                if job.status != "running" or job.cancel_flag:
+                    return
+                phase = job.events[-1]["type"] if job.events else "searching"
+                if phase == "writing":
+                    _emit(job, "writing", f"仍在整理报告… 已用时 {elapsed} 秒")
+                else:
+                    _emit(job, "searching", f"仍在研究中… 已用时 {elapsed} 秒")
+
+        heartbeat = asyncio.create_task(_heartbeat())
         _emit(job, "searching", "正在搜索与收集资料…")
-        result = await asyncio.to_thread(
+        invoke_coro = asyncio.to_thread(
             agent.invoke,
             {"messages": [{"role": "user", "content": job.topic}]},
+            {"recursion_limit": 40},
         )
+        if JOB_TIMEOUT_SECONDS > 0:
+            result = await asyncio.wait_for(invoke_coro, timeout=JOB_TIMEOUT_SECONDS)
+        else:
+            result = await invoke_coro
 
         if job.cancel_flag:
             job.status = "cancelled"
             _emit(job, "error", "任务已取消")
             return
 
+        if heartbeat is not None:
+            heartbeat.cancel()
+            heartbeat = None
+
         _emit(job, "writing", "正在整理研究报告…")
-        messages = result.get("messages", [])
-        final_text = ""
-        if messages:
-            last = messages[-1]
-            content = getattr(last, "content", None) or (last.get("content") if isinstance(last, dict) else "")
-            if isinstance(content, str):
-                final_text = content
-            elif isinstance(content, list):
-                final_text = "\n".join(
-                    block.get("text", "") if isinstance(block, dict) else str(block) for block in content
-                )
-
-        # Try virtual FS final report from agent state if present
-        files = result.get("files") or {}
-        if isinstance(files, dict) and "/final_report.md" in files:
-            final_text = files["/final_report.md"] or final_text
-
+        final_text = _extract_report_from_result(result)
         title, markdown = _extract_title_and_markdown(final_text, job.topic)
         job.title = title
         job.markdown = markdown
@@ -138,10 +215,22 @@ async def _run_job(job: JobState) -> None:
 
         job.status = "completed"
         _emit(job, "done", "研究报告已生成")
-    except Exception as e:
+    except TimeoutError:
+        job.error = f"研究超时（超过 {JOB_TIMEOUT_SECONDS} 秒）。请缩小主题后重试。"
+        _emit(job, "error", job.error)
+        job.cancel_flag = True
         job.status = "failed"
-        job.error = str(e)
-        _emit(job, "error", str(e))
+    except Exception as e:
+        from research_agent.tools import public_job_error
+
+        job.error = public_job_error(e)
+        _emit(job, "error", job.error)
+        job.status = "failed"
+    finally:
+        if heartbeat is not None:
+            heartbeat.cancel()
+        if hooks is not None:
+            unbind_job(hooks)
 
 
 @app.post("/research")
@@ -176,6 +265,7 @@ async def research_events(job_id: str, request: Request):
                     for ev in job.events[sent:]:
                         yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
                     sent = len(job.events)
+                    continue
                 if job.status in ("completed", "failed", "cancelled"):
                     break
                 try:
@@ -189,6 +279,20 @@ async def research_events(job_id: str, request: Request):
                 job.subscribers.remove(queue)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/research/{job_id}/status")
+async def research_status(job_id: str, request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(401, "unauthorized")
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "not found")
+    return {
+        "status": job.status,
+        "error": job.error,
+        "hasReport": bool(job.markdown.strip()),
+    }
 
 
 @app.get("/research/{job_id}/report")

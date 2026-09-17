@@ -98,11 +98,13 @@ cd packages/research-agent && uv sync && cd ../..
 
 ### 配置
 
+在**仓库根目录**创建唯一一份配置文件：
+
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，填写 API Key：
+编辑根目录 `.env`，填写 API Key（不要在 `packages/research-agent/` 下再建 `.env`）：
 
 ```env
 OPENAI_API_KEY=sk-xxx          # LLM 密钥（默认对接 DeepSeek）
@@ -209,6 +211,7 @@ research-publish-agent/
 | `OPENAI_BASE_URL` | `https://api.deepseek.com/v1` | LLM 接口地址 |
 | `OPENAI_MODEL` | `deepseek-chat` | 模型名称 |
 | `TAVILY_API_KEY` | — | Tavily 搜索 API Key |
+| `TAVILY_HTTPS_PROXY` | — | 访问 Tavily 的 HTTPS 代理，例如 `http://127.0.0.1:7890` |
 
 ---
 

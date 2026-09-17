@@ -6,6 +6,7 @@ import { adapterRegistry, trendRegistry } from '@wechatsync/core/adapters'
 import type { SyncManager } from './sync'
 import type { CookieBridge } from './ws-server'
 import type { NodeRuntime } from './runtime/node-runtime'
+import { extractHost, rootDomain } from './domains'
 
 export { trendRegistry }
 
@@ -36,12 +37,31 @@ export function startRestApi(
 
     if (req.method === 'GET' && url.pathname === '/platforms') {
       const metas = adapterRegistry.getAllMeta()
-      const platforms = metas.map((m) => ({
-        id: m.id,
-        name: m.name,
-        homepage: m.homepage,
-        loggedIn: m.homepage ? runtime.hasCookie(new URL(m.homepage).hostname) : false,
-      }))
+
+      // 插件已连接时，从浏览器同步 Cookie 到内存后再判断登录态
+      if (bridge.isConnected()) {
+        try {
+          const domains = new Set<string>()
+          for (const domain of await bridge.listLoggedIn()) domains.add(domain)
+          for (const m of metas) {
+            const host = extractHost(m.homepage)
+            if (host) domains.add(rootDomain(host))
+          }
+          if (domains.size) await bridge.requestCookies([...domains])
+        } catch (e) {
+          console.error('[api] 刷新 Cookie 失败', e)
+        }
+      }
+
+      const platforms = metas.map((m) => {
+        const host = extractHost(m.homepage)
+        return {
+          id: m.id,
+          name: m.name,
+          homepage: m.homepage,
+          loggedIn: host ? runtime.hasCookie(host) : false,
+        }
+      })
       res.writeHead(200)
       res.end(JSON.stringify({ platforms, total: platforms.length }))
       return
