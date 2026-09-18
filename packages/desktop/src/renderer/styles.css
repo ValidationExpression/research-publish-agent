@@ -4,7 +4,7 @@
   --sidebar: #f1f0ec;
   --surface: #ffffff;
   --ink: #17191c;
-  --muted: #6f7580;
+  --muted: #676d78;
   --border: #e4e2dc;
   --primary: #315cf5;
   --primary-soft: #eef2ff;
@@ -55,6 +55,7 @@ a { color: var(--primary); text-underline-offset: 3px; }
 /* 3. Native window chrome and application shell */
 .window-frame { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
 .titlebar { display: flex; flex-shrink: 0; align-items: center; gap: 8px; height: var(--titlebar-height, 40px); padding: 0 148px 0 20px; border-bottom: 1px solid var(--border); background: var(--canvas); -webkit-app-region: drag; user-select: none; }
+.titlebar.is-darwin { padding-right: 20px; padding-left: 84px; }
 .titlebar-mark { color: var(--primary); font-size: 14px; font-weight: 600; }
 .titlebar-title { color: var(--muted); font-size: 12px; font-weight: 500; }
 .app-shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1; min-height: 0; }

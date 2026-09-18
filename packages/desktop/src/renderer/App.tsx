@@ -70,6 +70,7 @@ export default function App() {
   }
 
   const chromeHeight = window.desktopApi?.titleBarHeight ?? 0
+  const platform = window.desktopApi?.platform ?? 'web'
   const hasChrome = chromeHeight > 0
 
   return (
@@ -78,7 +79,7 @@ export default function App() {
       style={hasChrome ? ({ '--titlebar-height': `${chromeHeight}px` } as CSSProperties) : undefined}
     >
       {hasChrome && (
-        <header className="titlebar" aria-label="窗口标题栏">
+        <header className={`titlebar${platform === 'darwin' ? ' is-darwin' : ''}`} aria-label="窗口标题栏">
           <span className="titlebar-mark" aria-hidden="true">R</span>
           <span className="titlebar-title">Research Publish</span>
         </header>

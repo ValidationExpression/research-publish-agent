@@ -10,10 +10,14 @@ const review = readFileSync(`${root}/src/renderer/pages/ReviewPage.tsx`, 'utf8')
 const research = readFileSync(`${root}/src/renderer/pages/ResearchPage.tsx`, 'utf8')
 const publish = readFileSync(`${root}/src/renderer/pages/PublishPage.tsx`, 'utf8')
 const html = readFileSync(`${root}/src/renderer/index.html`, 'utf8')
+const preview = readFileSync(`${root}/src/renderer/main.tsx`, 'utf8')
+const desktopMain = readFileSync(`${root}/src/main/index.ts`, 'utf8')
 
 assert.ok(sidebar.includes('className="workflow-sidebar"'), 'sidebar lacks canonical styling hook')
 assert.ok(sidebar.includes('>R</span>'), 'brand monogram is not modernized')
 assert.ok(app.includes('>R</span>'), 'window titlebar monogram is not modernized')
+assert.ok(app.includes("platform === 'darwin' ? ' is-darwin' : ''"), 'macOS titlebar does not reserve traffic-light space')
+assert.ok(css.includes('.titlebar.is-darwin'), 'macOS titlebar spacing rule is missing')
 assert.ok(css.includes('.research-timeline-row.is-done'), 'completed research log is not styled')
 assert.ok(review.includes('className="review-workspace"'), 'review lacks canonical styling hook')
 assert.ok(!review.includes('纸面'), 'legacy paper preview copy remains')
@@ -28,6 +32,7 @@ for (const state of ['is-loading', 'is-success', 'is-error']) {
 for (const token of ['#fbfaf7', '#f1f0ec', '#17191c', '#315cf5']) {
   assert.ok(css.toLowerCase().includes(token), `missing approved token ${token}`)
 }
+assert.ok(css.toLowerCase().includes('--muted: #676d78'), 'small muted text token lacks 4.5:1 contrast across app surfaces')
 for (const selector of ['.workflow-sidebar', '.research-composer', '.review-workspace', '.platform-row']) {
   assert.ok(css.includes(selector), `missing selector ${selector}`)
 }
@@ -40,5 +45,27 @@ assert.ok(html.includes('lang="zh-CN"'), 'document language is not set')
 assert.ok(html.includes('<title>Research Publish</title>'), 'document title is not set')
 assert.ok(/name="theme-color" content="#fbfaf7"/i.test(html), 'document theme color does not match')
 assert.ok(!html.includes('fonts.googleapis.com'), 'external font request remains')
+
+assert.ok(!/kami|纸感|纸面|羊皮纸|好纸/i.test(preview), 'legacy paper preview copy remains')
+assert.ok(preview.includes('publish: { connected: true }'), 'preview does not exercise connected publish service')
+for (const copy of [
+  '2026 年主流 AI Agent 框架对比',
+  '本文从架构设计、工具调用、状态管理与生产部署四个维度进行比较。',
+  '生产选型应优先考虑可观测性与故障恢复。',
+]) {
+  assert.ok(preview.includes(copy), `missing neutral preview copy: ${copy}`)
+}
+const previewSse = preview.match(/startResearchSse:[\s\S]*?\n\s*},/)?.[0] ?? ''
+const progressEvents = previewSse.match(/type: 'progress'/g) ?? []
+assert.ok(progressEvents.length >= 2, 'preview SSE needs at least two progress events')
+assert.ok(previewSse.includes('await delay('), 'preview SSE progress is not asynchronous')
+assert.ok(
+  previewSse.lastIndexOf("type: 'progress'") < previewSse.indexOf("type: 'done'"),
+  'preview SSE must emit progress before done',
+)
+
+assert.ok(!desktopMain.includes('KAMI_'), 'legacy KAMI native chrome constants remain')
+assert.ok(desktopMain.includes("'#FBFAF7'"), 'native window background is not approved warm white')
+assert.ok(desktopMain.includes("'#6F7580'"), 'native overlay symbol is not approved secondary text color')
 
 console.log('Modern UI source verification passed')
