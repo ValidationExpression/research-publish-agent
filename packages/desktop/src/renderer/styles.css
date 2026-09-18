@@ -12,7 +12,7 @@
   --warning: #c77a16;
   --danger: #c8473b;
   --font-sans: Inter, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", "PingFang SC", "Microsoft YaHei", monospace;
   --shadow-composer: 0 18px 45px rgba(32, 38, 52, 0.08);
   --radius-sm: 6px;
   --radius-md: 8px;

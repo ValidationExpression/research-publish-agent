@@ -20,6 +20,7 @@ assert.ok(!review.includes('纸面'), 'legacy paper preview copy remains')
 assert.ok(publish.includes('platform-row'), 'platform rows lack canonical styling hook')
 assert.ok(publish.includes('publish-feedback'), 'publish feedback lacks semantic styling hook')
 assert.ok(research.includes("running ? '研究进行中' : '研究进度'"), 'running research lacks a visible text status')
+assert.ok(research.includes('(running || logs.length > 0) && ('), 'initial POST wait hides the research status')
 for (const state of ['is-loading', 'is-success', 'is-error']) {
   assert.ok(publish.includes(state), `missing publish feedback state ${state}`)
 }
@@ -34,6 +35,7 @@ assert.ok(css.includes('@media (max-width: 900px)'), 'missing narrow-window layo
 assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'missing reduced-motion support')
 assert.ok(app.includes('WorkflowSidebar'), 'App is not using WorkflowSidebar')
 assert.ok(!css.includes("'Noto Serif SC'"), 'legacy serif stack remains')
+assert.ok(/--font-mono:[^;]*"PingFang SC",\s*"Microsoft YaHei",\s*monospace;/.test(css), 'Markdown editor lacks Chinese sans fallbacks')
 assert.ok(html.includes('lang="zh-CN"'), 'document language is not set')
 assert.ok(html.includes('<title>Research Publish</title>'), 'document title is not set')
 assert.ok(/name="theme-color" content="#fbfaf7"/i.test(html), 'document theme color does not match')

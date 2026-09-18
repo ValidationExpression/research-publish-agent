@@ -195,7 +195,7 @@ export function ResearchPage({ onComplete }: Props) {
         <li><IconReport /><strong>生成报告</strong><span>输出可继续编辑的 Markdown</span></li>
       </ol>
 
-      {logs.length > 0 && (
+      {(running || logs.length > 0) && (
         <section className="research-progress" aria-label="研究进度">
           <div className="research-progress-header">
             <span className="research-progress-title" role="status">{running ? '研究进行中' : '研究进度'}</span>
