@@ -11,8 +11,10 @@ export interface PublishSyncResult {
   error?: string
 }
 
+export type PublishSyncTaskStatus = 'running' | 'completed' | 'failed'
+
 export interface PublishSyncStatus {
-  status: string
+  status: PublishSyncTaskStatus
   results: PublishSyncResult[]
 }
 
@@ -41,7 +43,7 @@ export function parseSyncStart(data: unknown): string | null {
 }
 
 export function parseSyncStatus(data: unknown): PublishSyncStatus | null {
-  if (!isRecord(data) || typeof data.status !== 'string' || !Array.isArray(data.results)) return null
+  if (!isRecord(data) || !isPublishSyncTaskStatus(data.status) || !Array.isArray(data.results)) return null
 
   const results: PublishSyncResult[] = []
   for (const result of data.results) {
@@ -54,6 +56,10 @@ export function parseSyncStatus(data: unknown): PublishSyncStatus | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isPublishSyncTaskStatus(value: unknown): value is PublishSyncTaskStatus {
+  return value === 'running' || value === 'completed' || value === 'failed'
 }
 
 function isSyncResult(value: unknown): value is PublishSyncResult {

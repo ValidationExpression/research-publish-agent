@@ -53,4 +53,19 @@ describe('publish view model', () => {
     })
     expect(parseSyncStatus({ status: 'running', results: [{ platform: 'csdn', success: 'yes' }] })).toBeNull()
   })
+
+  it('accepts a failed terminal status', () => {
+    expect(parseSyncStatus({
+      status: 'failed',
+      results: [{ platform: 'csdn', success: false, error: 'Cookie 已过期' }],
+    })).toEqual({
+      status: 'failed',
+      results: [{ platform: 'csdn', success: false, error: 'Cookie 已过期' }],
+    })
+  })
+
+  it('rejects empty and unknown polling statuses', () => {
+    expect(parseSyncStatus({ status: '', results: [] })).toBeNull()
+    expect(parseSyncStatus({ status: 'cancelled', results: [] })).toBeNull()
+  })
 })

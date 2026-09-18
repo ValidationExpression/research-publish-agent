@@ -137,8 +137,13 @@ export function PublishPage({ article }: Props) {
         }
 
         setResults(task.results)
-        if (task.status !== 'running') {
-          setLog(task.status === 'completed' ? '发布完成（草稿）' : '发布结束')
+        if (task.status === 'completed') {
+          setLog('发布完成（草稿）')
+          setPublishing(false)
+          return
+        }
+        if (task.status === 'failed') {
+          setLog(task.results.length > 0 ? '发布失败，请查看下方平台结果。' : '发布失败。')
           setPublishing(false)
           return
         }
