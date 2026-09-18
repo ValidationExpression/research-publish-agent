@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, type IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import type { PublishRuntime } from '@wechatsync/local-server/publish-runtime'
 import { loadRootEnv } from './load-root-env'
@@ -16,10 +16,41 @@ function getRendererUrl(): string {
   return `file://${path.join(__dirname, '../renderer/index.html')}`
 }
 
+const APP_CANVAS = '#FBFAF7'
+const TITLEBAR_SYMBOL = '#6F7580'
+const TITLEBAR_HEIGHT = 40
+
 function createWindow(): void {
+  const isMac = process.platform === 'darwin'
+  const isWin = process.platform === 'win32'
+  Menu.setApplicationMenu(
+    isMac
+      ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+      : null,
+  )
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 860,
+    backgroundColor: APP_CANVAS,
+    autoHideMenuBar: true,
+    title: 'Research Publish',
+    ...(isMac
+      ? {
+          titleBarStyle: 'hiddenInset',
+          trafficLightPosition: { x: 16, y: 14 },
+        }
+      : {}),
+    ...(isWin
+      ? {
+          titleBarStyle: 'hidden',
+          titleBarOverlay: {
+            color: APP_CANVAS,
+            symbolColor: TITLEBAR_SYMBOL,
+            height: TITLEBAR_HEIGHT,
+          },
+        }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

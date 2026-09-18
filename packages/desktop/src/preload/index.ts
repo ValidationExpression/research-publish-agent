@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('desktopApi', {
+  platform: process.platform,
+  titleBarHeight: process.platform === 'win32' || process.platform === 'darwin' ? 40 : 0,
   getConfig: () => ipcRenderer.invoke('get-config'),
   getServiceStatus: () => ipcRenderer.invoke('get-service-status'),
   publishFetch: (path: string, init?: { method?: string; body?: string }) =>
@@ -26,6 +28,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
 })
 
 export type DesktopApi = {
+  platform: string
+  titleBarHeight: number
   getConfig: () => Promise<unknown>
   getServiceStatus: () => Promise<unknown>
   publishFetch: (path: string, init?: { method?: string; body?: string }) => Promise<{ ok: boolean; status: number; data: unknown }>

@@ -14,6 +14,7 @@ export default defineConfig({
   target: 'node18',
   platform: 'node',
   outDir: 'dist',
+  dts: true,
   clean: false,
   // 仅打包 @wechatsync/core 的 TS 源码（连同 local-server 自己的源码）；
   // npm 依赖（js-md5、linkedom、marked…）保持 external，由 Node 运行时解析。
