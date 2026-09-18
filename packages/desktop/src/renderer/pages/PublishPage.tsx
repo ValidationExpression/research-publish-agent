@@ -3,31 +3,30 @@ import { marked } from 'marked'
 import type { ArticleDraft } from '../App'
 import { IconAlert, IconCheck, IconLock, IconRefresh } from '../components/Icons'
 import {
+  parseSyncStart,
+  parseSyncStatus,
   reconcileSelection,
+  seedPreferredSelection,
   sortPlatforms,
   type PublishPlatform,
+  type PublishSyncResult,
 } from '../publish-view-model'
-
-interface SyncResult {
-  platform: string
-  success: boolean
-  postUrl?: string
-  error?: string
-}
 
 interface Props {
   article: ArticleDraft
 }
 
 const platformLoadError = '无法读取平台状态，请确认 Cookie 插件已连接后重试。'
+const preferredPlatformIds = ['csdn', 'weixin']
 
 export function PublishPage({ article }: Props) {
   const [platforms, setPlatforms] = useState<PublishPlatform[]>([])
-  const [selected, setSelected] = useState<Set<string>>(new Set(['csdn', 'weixin']))
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loadingPlatforms, setLoadingPlatforms] = useState(true)
   const [platformError, setPlatformError] = useState<string | null>(null)
+  const [hasLoadedPlatforms, setHasLoadedPlatforms] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [results, setResults] = useState<SyncResult[]>([])
+  const [results, setResults] = useState<PublishSyncResult[]>([])
   const [log, setLog] = useState('')
 
   useEffect(() => {
@@ -55,7 +54,10 @@ export function PublishPage({ article }: Props) {
 
       const sorted = sortPlatforms(list)
       setPlatforms(sorted)
-      setSelected((previous) => reconcileSelection(sorted, previous))
+      setSelected((previous) => hasLoadedPlatforms
+        ? reconcileSelection(sorted, previous)
+        : seedPreferredSelection(sorted, preferredPlatformIds))
+      setHasLoadedPlatforms(true)
       setLoadingPlatforms(false)
     } catch {
       setPlatformError(platformLoadError)
@@ -103,7 +105,13 @@ export function PublishPage({ article }: Props) {
         return
       }
 
-      const syncId = (res.data as { syncId: string }).syncId
+      const syncId = parseSyncStart(res.data)
+      if (!syncId) {
+        setLog('发布请求响应无效，请重试。')
+        setPublishing(false)
+        return
+      }
+
       for (let i = 0; i < 60; i++) {
         await new Promise((resolve) => setTimeout(resolve, 2000))
         let taskRes
@@ -115,9 +123,20 @@ export function PublishPage({ article }: Props) {
           return
         }
 
-        if (!taskRes.ok || !taskRes.data || typeof taskRes.data !== 'object') continue
-        const task = taskRes.data as { status: string; results: SyncResult[] }
-        setResults(task.results || [])
+        if (!taskRes.ok || !taskRes.data || typeof taskRes.data !== 'object') {
+          setLog('发布状态响应无效，请重试。')
+          setPublishing(false)
+          return
+        }
+
+        const task = parseSyncStatus(taskRes.data)
+        if (!task) {
+          setLog('发布状态响应无效，请重试。')
+          setPublishing(false)
+          return
+        }
+
+        setResults(task.results)
         if (task.status !== 'running') {
           setLog(task.status === 'completed' ? '发布完成（草稿）' : '发布结束')
           setPublishing(false)
