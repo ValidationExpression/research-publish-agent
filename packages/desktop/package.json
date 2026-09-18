@@ -8,10 +8,11 @@
     "test": "vitest run",
     "verify:ui": "node scripts/verify-modern-ui.mjs",
     "dev": "pnpm --filter @wechatsync/local-server build && pnpm build:main && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env NODE_ENV=development electron .\"",
+    "build:local-server": "pnpm --filter @wechatsync/local-server build",
     "build:main": "tsup",
     "build:renderer": "vite build",
-    "build": "pnpm build:main && pnpm build:renderer",
-    "typecheck": "tsc --noEmit"
+    "build": "pnpm build:local-server && pnpm build:main && pnpm build:renderer",
+    "typecheck": "pnpm build:local-server && tsc --noEmit"
   },
   "dependencies": {
     "@wechatsync/local-server": "workspace:*",

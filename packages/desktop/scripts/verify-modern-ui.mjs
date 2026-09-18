@@ -12,6 +12,12 @@ const publish = readFileSync(`${root}/src/renderer/pages/PublishPage.tsx`, 'utf8
 const html = readFileSync(`${root}/src/renderer/index.html`, 'utf8')
 const preview = readFileSync(`${root}/src/renderer/main.tsx`, 'utf8')
 const desktopMain = readFileSync(`${root}/src/main/index.ts`, 'utf8')
+const desktopPackage = JSON.parse(readFileSync(`${root}/package.json`, 'utf8'))
+
+const localServerBuild = 'pnpm --filter @wechatsync/local-server build'
+assert.equal(desktopPackage.scripts['build:local-server'], localServerBuild, 'desktop lacks a local-server build prerequisite')
+assert.ok(desktopPackage.scripts.typecheck.startsWith('pnpm build:local-server && '), 'desktop typecheck skips declaration generation')
+assert.ok(desktopPackage.scripts.build.startsWith('pnpm build:local-server && '), 'desktop build skips declaration generation')
 
 assert.ok(sidebar.includes('className="workflow-sidebar"'), 'sidebar lacks canonical styling hook')
 assert.ok(sidebar.includes('>R</span>'), 'brand monogram is not modernized')
