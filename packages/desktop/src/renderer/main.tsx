@@ -86,7 +86,9 @@ function installDevPreviewApi(): void {
   }
 }
 
-installDevPreviewApi()
+if (import.meta.env.DEV) {
+  installDevPreviewApi()
+}
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -21,9 +21,13 @@ const TITLEBAR_SYMBOL = '#6F7580'
 const TITLEBAR_HEIGHT = 40
 
 function createWindow(): void {
-  Menu.setApplicationMenu(null)
   const isMac = process.platform === 'darwin'
   const isWin = process.platform === 'win32'
+  Menu.setApplicationMenu(
+    isMac
+      ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+      : null,
+  )
 
   mainWindow = new BrowserWindow({
     width: 1280,

@@ -5,6 +5,7 @@ import { PublishPage } from './pages/PublishPage'
 import { PageHeader } from './components/PageHeader'
 import { WorkflowSidebar } from './components/WorkflowSidebar'
 import type { AppStep, ServiceRequestPhase, WorkflowArticle } from './workflow'
+import { parseServiceStatus } from './workflow'
 
 export type { AppStep } from './workflow'
 
@@ -41,12 +42,10 @@ export default function App() {
   const refreshStatus = useCallback(async () => {
     setServiceStatusPhase('loading')
     try {
-      const status = await window.desktopApi.getServiceStatus() as {
-        publish?: { connected?: boolean }
-        research?: { ok?: boolean }
-      }
-      setPublishConnected(!!status.publish?.connected)
-      setResearchOk(!!status.research?.ok)
+      const status = parseServiceStatus(await window.desktopApi.getServiceStatus())
+      if (!status.ok) throw new Error(status.error)
+      setPublishConnected(status.publishConnected)
+      setResearchOk(status.researchOk)
       setHasResolvedServiceStatus(true)
       setServiceStatusPhase('success')
       setServiceStatusError(null)

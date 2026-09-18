@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { canStartResearch, classifyResearchLog, getResearchLogMessage } from './research-view-model'
+import { canStartResearch, classifyResearchLog, getResearchLogMessage, parseResearchReport } from './research-view-model'
+
+describe('parseResearchReport', () => {
+  it('accepts a report and preserves its title and Markdown', () => {
+    const report = { title: ' 研究标题 ', markdown: '# 报告\n\n正文\n' }
+    expect(parseResearchReport(report)).toEqual(report)
+  })
+
+  it.each([undefined, '', '   '])('rejects a missing or empty title: %s', (title) => {
+    expect(parseResearchReport({ title, markdown: '# 报告' })).toBeNull()
+  })
+
+  it.each([undefined, '', ' \n\t '])('rejects missing or empty Markdown: %s', (markdown) => {
+    expect(parseResearchReport({ title: '标题', markdown })).toBeNull()
+  })
+
+  it.each([null, 'report', [], { title: {}, markdown: '# 报告' }, { title: '标题', markdown: 42 }].map((data) => [data]))(
+    'rejects invalid payload and field types: %j',
+    (data) => { expect(parseResearchReport(data)).toBeNull() },
+  )
+})
 
 describe('research view model', () => {
   it('starts only with non-empty text while idle', () => {

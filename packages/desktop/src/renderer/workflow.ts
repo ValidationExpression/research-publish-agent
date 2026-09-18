@@ -22,6 +22,27 @@ export interface ServiceStatusView {
   state: ServiceStatusViewState
 }
 
+type ServiceStatusResult =
+  | { ok: true; publishConnected: boolean; researchOk: boolean }
+  | { ok: false; error: string }
+
+export function parseServiceStatus(data: unknown): ServiceStatusResult {
+  const invalid: ServiceStatusResult = { ok: false, error: '服务状态响应无效' }
+  if (!data || typeof data !== 'object') return invalid
+  const { publish, research } = data as Record<string, unknown>
+  for (const service of [publish, research]) {
+    if (!service || typeof service !== 'object') return invalid
+    const { error } = service as Record<string, unknown>
+    if (error !== undefined && error !== null) {
+      return { ok: false, error: typeof error === 'string' && error.trim() ? error : '服务状态刷新失败' }
+    }
+  }
+  const { connected } = publish as Record<string, unknown>
+  const { ok } = research as Record<string, unknown>
+  if (typeof connected !== 'boolean' || typeof ok !== 'boolean') return invalid
+  return { ok: true, publishConnected: connected, researchOk: ok }
+}
+
 const STEP_COPY: Omit<WorkflowStepView, 'state'>[] = [
   { id: 'research', index: '01', title: '研究', description: '联网检索并生成报告' },
   { id: 'review', index: '02', title: '审阅', description: '调整标题与正文' },

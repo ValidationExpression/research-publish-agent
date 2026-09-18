@@ -18,6 +18,19 @@ export interface PublishSyncStatus {
   results: PublishSyncResult[]
 }
 
+export function parsePlatforms(data: unknown): PublishPlatform[] | null {
+  if (!isRecord(data) || !Array.isArray(data.platforms)) return null
+  const platforms: PublishPlatform[] = []
+  for (const platform of data.platforms) {
+    if (!isRecord(platform)) return null
+    if (typeof platform.id !== 'string' || !platform.id.trim()) return null
+    if (typeof platform.name !== 'string' || !platform.name.trim()) return null
+    if (typeof platform.loggedIn !== 'boolean') return null
+    platforms.push({ id: platform.id, name: platform.name, loggedIn: platform.loggedIn })
+  }
+  return platforms
+}
+
 export function sortPlatforms(platforms: PublishPlatform[]): PublishPlatform[] {
   return [...platforms].sort((a, b) => {
     if (a.loggedIn !== b.loggedIn) return a.loggedIn ? -1 : 1

@@ -1,7 +1,7 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import type { ArticleDraft } from '../App'
 import { IconArrowRight, IconGlobe, IconLayers, IconReport } from '../components/Icons'
-import { RESEARCH_SUGGESTIONS, canStartResearch, classifyResearchLog, getResearchLogMessage } from '../research-view-model'
+import { RESEARCH_SUGGESTIONS, canStartResearch, classifyResearchLog, getResearchLogMessage, parseResearchReport } from '../research-view-model'
 
 interface Props {
   onComplete: (draft: ArticleDraft) => void
@@ -13,30 +13,29 @@ export function ResearchPage({ onComplete }: Props) {
   const [logs, setLogs] = useState<string[]>([])
   const jobIdRef = useRef<string | null>(null)
   const doneRef = useRef(false)
+  const pollingRef = useRef<string | null>(null)
   const logRef = useRef<HTMLOListElement>(null)
 
   useEffect(() => {
     const offEv = window.desktopApi.onResearchSseEvent((ev) => {
-      if (jobIdRef.current && ev.jobId !== jobIdRef.current) return
+      if (ev.jobId !== jobIdRef.current || doneRef.current) return
       setLogs((prev) => [...prev, `[${ev.type}] ${ev.message}`])
       if (ev.type === 'done') {
-        doneRef.current = true
-        void loadReport(ev.jobId)
+        void pollUntilDone(ev.jobId, true)
       }
       if (ev.type === 'error') {
+        jobIdRef.current = null
         setRunning(false)
       }
     })
     const offErr = window.desktopApi.onResearchSseError((ev) => {
-      if (jobIdRef.current && ev.jobId !== jobIdRef.current) return
+      if (ev.jobId !== jobIdRef.current || doneRef.current) return
       setLogs((prev) => [...prev, `[error] ${ev.error}`])
       void pollUntilDone(ev.jobId)
     })
     const offEnd = window.desktopApi.onResearchSseEnd((ev) => {
-      if (jobIdRef.current && ev.jobId !== jobIdRef.current) return
-      if (!doneRef.current) {
-        void pollUntilDone(ev.jobId)
-      }
+      if (ev.jobId !== jobIdRef.current || doneRef.current) return
+      void pollUntilDone(ev.jobId)
     })
     return () => {
       offEv()
@@ -51,6 +50,7 @@ export function ResearchPage({ onComplete }: Props) {
   }, [logs])
 
   function stopResearchWithError(message: string) {
+    jobIdRef.current = null
     setLogs((prev) => [...prev, `[error] ${message}`])
     setRunning(false)
   }
@@ -58,31 +58,31 @@ export function ResearchPage({ onComplete }: Props) {
   async function loadReport(id: string): Promise<boolean> {
     try {
       const res = await window.desktopApi.researchFetch(`/research/${id}/report`)
-      if (res.ok && res.data && typeof res.data === 'object') {
-        const data = res.data as { title: string; markdown: string }
-        if ((data.markdown || '').trim()) {
-          doneRef.current = true
-          setRunning(false)
-          onComplete({ title: data.title, markdown: data.markdown })
-          return true
-        }
-      }
-    } catch {
-      stopResearchWithError('加载研究报告失败，请稍后重试')
+      if (id !== jobIdRef.current || doneRef.current) return true
+      const report = res.ok ? parseResearchReport(res.data) : null
+      if (!report) return false
+      doneRef.current = true
+      setRunning(false)
+      onComplete(report)
       return true
+    } catch {
+      return false
     }
-    return false
   }
 
-  async function pollUntilDone(id: string) {
+  async function pollUntilDone(id: string, tryReportFirst = false) {
+    if (pollingRef.current === id || id !== jobIdRef.current || doneRef.current) return
+    pollingRef.current = id
     try {
+      if (tryReportFirst && await loadReport(id)) return
       for (let i = 0; i < 30; i++) {
-        if (doneRef.current) return
+        if (doneRef.current || id !== jobIdRef.current) return
         const statusRes = await window.desktopApi.researchFetch(`/research/${id}/status`)
+        if (doneRef.current || id !== jobIdRef.current) return
         if (statusRes.ok && statusRes.data && typeof statusRes.data === 'object') {
           const status = statusRes.data as { status: string; error?: string; hasReport?: boolean }
           if (status.status === 'failed') {
-            stopResearchWithError(status.error || '研究失败')
+            stopResearchWithError(typeof status.error === 'string' && status.error.trim() ? status.error : '研究失败')
             return
           }
           if (status.status === 'completed' || status.hasReport) {
@@ -92,11 +92,12 @@ export function ResearchPage({ onComplete }: Props) {
         }
         await new Promise((r) => setTimeout(r, 2000))
       }
+      if (id === jobIdRef.current) stopResearchWithError('等待报告超时，请稍后重试')
     } catch {
-      stopResearchWithError('检查研究状态失败，请稍后重试')
-      return
+      if (id === jobIdRef.current) stopResearchWithError('检查研究状态失败，请稍后重试')
+    } finally {
+      if (pollingRef.current === id) pollingRef.current = null
     }
-    stopResearchWithError('等待报告超时，请稍后重试')
   }
 
   async function startResearch() {
@@ -104,6 +105,7 @@ export function ResearchPage({ onComplete }: Props) {
     setRunning(true)
     setLogs([])
     doneRef.current = false
+    jobIdRef.current = null
     let res: Awaited<ReturnType<typeof window.desktopApi.researchFetch>>
     try {
       res = await window.desktopApi.researchFetch('/research', {

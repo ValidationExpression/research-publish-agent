@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { getServiceStatusView, getWorkflowSteps } from './workflow'
+import { getServiceStatusView, getWorkflowSteps, parseServiceStatus } from './workflow'
+
+describe('parseServiceStatus', () => {
+  it('accepts explicit healthy and unhealthy service booleans', () => {
+    expect(parseServiceStatus({ publish: { connected: true }, research: { ok: false } }))
+      .toEqual({ ok: true, publishConnected: true, researchOk: false })
+  })
+
+  it.each(['publish', 'research'])('rejects a resolved %s error before accepting booleans', (service) => {
+    const status = { publish: { connected: false }, research: { ok: false }, [service]: { error: '服务暂不可用' } }
+    expect(parseServiceStatus(status)).toEqual({ ok: false, error: '服务暂不可用' })
+  })
+
+  it('rejects error payloads even when they include apparently healthy booleans', () => {
+    expect(parseServiceStatus({ publish: { connected: true, error: {} }, research: { ok: true } }))
+      .toEqual({ ok: false, error: '服务状态刷新失败' })
+  })
+
+  it.each([null, {}, { publish: { connected: 'false' }, research: { ok: true } }])(
+    'rejects malformed service responses: %j',
+    (status) => { expect(parseServiceStatus(status)).toEqual({ ok: false, error: '服务状态响应无效' }) },
+  )
+})
 
 describe('getWorkflowSteps', () => {
   it('locks later steps before a report exists', () => {

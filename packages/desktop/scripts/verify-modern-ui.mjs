@@ -74,4 +74,18 @@ assert.ok(!desktopMain.includes('KAMI_'), 'legacy KAMI native chrome constants r
 assert.ok(desktopMain.includes("'#FBFAF7'"), 'native window background is not approved warm white')
 assert.ok(desktopMain.includes("'#6F7580'"), 'native overlay symbol is not approved secondary text color')
 
+const loadReport = research.slice(research.indexOf('async function loadReport'), research.indexOf('async function pollUntilDone'))
+const pollReport = research.slice(research.indexOf('async function pollUntilDone'), research.indexOf('async function startResearch'))
+const finalReviewChecks = [
+  ['macOS keeps the native application and editing menus', /Menu\.setApplicationMenu\(\s*isMac\s*\? Menu\.buildFromTemplate\(\[\s*\{ role: 'appMenu' \},\s*\{ role: 'editMenu' \},?\s*\]\)\s*: null/.test(desktopMain)],
+  ['preview fixtures are installed only in development', /if \(import\.meta\.env\.DEV\) \{\s*installDevPreviewApi\(\)\s*\}/.test(preview)],
+  ['report completion is assigned only after successful parsing', (research.match(/doneRef\.current = true/g) ?? []).length === 1 && /const report = res\.ok \? parseResearchReport\(res\.data\) : null[\s\S]*?if \(!report\) return false[\s\S]*?doneRef\.current = true[\s\S]*?onComplete\(report\)/.test(loadReport)],
+  ['SSE done uses the shared recovery path', /if \(ev\.type === 'done'\) \{\s*void pollUntilDone\(ev\.jobId, true\)/.test(research)],
+  ['recovery deduplicates before making requests', /if \([^\n]*pollingRef\.current === id[^\n]*\) return\s*pollingRef\.current = id/.test(pollReport)],
+  ['an unsuccessful report load falls through to bounded status polling', /if \(tryReportFirst && await loadReport\(id\)\) return\s*for \(let i = 0; i < 30; i\+\+\)/.test(pollReport)],
+  ['platform entries are validated before sorting', /const list = res\.ok \? parsePlatforms\(res\.data\) : null\s*if \(!list\)/.test(publish)],
+  ['service errors are checked before replacing known booleans', /const status = parseServiceStatus\(await window\.desktopApi\.getServiceStatus\(\)\)\s*if \(!status\.ok\) throw new Error\(status\.error\)\s*setPublishConnected\(status\.publishConnected\)/.test(app)],
+]
+assert.deepEqual(finalReviewChecks.filter(([, passed]) => !passed).map(([message]) => message), [], 'final review safeguards failed')
+
 console.log('Modern UI source verification passed')

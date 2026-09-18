@@ -3,6 +3,7 @@ import { marked } from 'marked'
 import type { ArticleDraft } from '../App'
 import { IconAlert, IconCheck, IconLock, IconRefresh } from '../components/Icons'
 import {
+  parsePlatforms,
   parseSyncStart,
   parseSyncStatus,
   reconcileSelection,
@@ -39,14 +40,8 @@ export function PublishPage({ article }: Props) {
 
     try {
       const res = await window.desktopApi.publishFetch('/platforms')
-      if (!res.ok || !res.data || typeof res.data !== 'object') {
-        setPlatformError('无法读取平台状态，请确认 Cookie 插件已连接后重试。')
-        setLoadingPlatforms(false)
-        return
-      }
-
-      const list = (res.data as { platforms?: PublishPlatform[] }).platforms
-      if (!Array.isArray(list)) {
+      const list = res.ok ? parsePlatforms(res.data) : null
+      if (!list) {
         setPlatformError(platformLoadError)
         setLoadingPlatforms(false)
         return

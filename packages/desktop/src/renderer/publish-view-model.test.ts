@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  parsePlatforms,
   parseSyncStart,
   parseSyncStatus,
   reconcileSelection,
@@ -12,6 +13,30 @@ const platforms = [
   { id: 'csdn', name: 'CSDN', loggedIn: true },
   { id: 'weixin', name: '微信公众号', loggedIn: true },
 ]
+
+describe('parsePlatforms', () => {
+  it('accepts valid platform entries including logged-out platforms', () => {
+    expect(parsePlatforms({ platforms })).toEqual(platforms)
+    expect(parsePlatforms({ platforms: [] })).toEqual([])
+  })
+
+  it.each([undefined, '', '  ', 42, {}])('rejects malformed IDs: %j', (id) => {
+    expect(parsePlatforms({ platforms: [{ id, name: '知乎', loggedIn: true }] })).toBeNull()
+  })
+
+  it.each([undefined, '', '  ', 42, {}])('rejects malformed names: %j', (name) => {
+    expect(parsePlatforms({ platforms: [{ id: 'zhihu', name, loggedIn: true }] })).toBeNull()
+  })
+
+  it.each([undefined, 'false', 0, null])('rejects nonboolean login states: %j', (loggedIn) => {
+    expect(parsePlatforms({ platforms: [{ id: 'zhihu', name: '知乎', loggedIn }] })).toBeNull()
+  })
+
+  it.each([null, [], {}, { platforms: {} }, { platforms: [null] }, { platforms: [...platforms, {}] }].map((data) => [data]))(
+    'rejects the whole response when the list or any entry is invalid: %j',
+    (data) => { expect(parsePlatforms(data)).toBeNull() },
+  )
+})
 
 describe('publish view model', () => {
   it('puts logged-in platforms first', () => {
