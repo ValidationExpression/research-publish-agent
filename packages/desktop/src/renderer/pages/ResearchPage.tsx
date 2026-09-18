@@ -198,7 +198,7 @@ export function ResearchPage({ onComplete }: Props) {
       {logs.length > 0 && (
         <section className="research-progress" aria-label="研究进度">
           <div className="research-progress-header">
-            <span className="research-progress-title">研究进度</span>
+            <span className="research-progress-title" role="status">{running ? '研究进行中' : '研究进度'}</span>
             {running && <span className="spinner" aria-label="研究中" />}
           </div>
           <ol className="research-timeline" role="log" aria-live="polite" ref={logRef}>

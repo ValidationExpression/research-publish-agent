@@ -6,6 +6,7 @@
   "main": "dist/main/index.js",
   "scripts": {
     "test": "vitest run",
+    "verify:ui": "node scripts/verify-modern-ui.mjs",
     "dev": "pnpm --filter @wechatsync/local-server build && pnpm build:main && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env NODE_ENV=development electron .\"",
     "build:main": "tsup",
     "build:renderer": "vite build",

@@ -162,7 +162,7 @@ export function PublishPage({ article }: Props) {
   const canPublish = !loadingPlatforms && !platformError && !publishing && selected.size > 0
 
   return (
-    <div className="card">
+    <div className="publish-workspace">
       <div className="card-header">
         <div>
           <h2 className="card-title">选择发布平台</h2>
@@ -193,14 +193,14 @@ export function PublishPage({ article }: Props) {
       ) : platforms.length === 0 ? (
         <p className="platform-empty">尚未读到平台列表。确认 Cookie 插件已连接后，点右上角刷新。</p>
       ) : (
-        <div className="platform-list" role="group" aria-label="发布平台" style={{ gridTemplateColumns: '1fr' }}>
+        <div className="platform-list" role="group" aria-label="发布平台">
           {platforms.map((platform) => {
             const isSelected = selected.has(platform.id)
             const isUnavailable = !platform.loggedIn
             return (
               <label
                 key={platform.id}
-                className={`platform-item ${isSelected ? 'selected' : ''}`}
+                className={`platform-row ${isSelected ? 'selected' : ''}`}
                 aria-disabled={isUnavailable || publishing}
               >
                 <input
@@ -219,10 +219,7 @@ export function PublishPage({ article }: Props) {
         </div>
       )}
 
-      <div
-        className="actions"
-        style={{ position: 'sticky', bottom: 0, paddingTop: 16, paddingBottom: 2, background: 'var(--ivory)' }}
-      >
+      <div className="publish-actions">
         <button type="button" className="btn btn-primary" onClick={() => void publish()} disabled={!canPublish}>
           {publishing ? (
             <>
@@ -236,7 +233,11 @@ export function PublishPage({ article }: Props) {
       </div>
 
       <div aria-live="polite" aria-atomic="true">
-        {log && <p className="card-subtitle" style={{ marginTop: 16 }}>{log}</p>}
+        {log && (
+          <p className={`publish-feedback ${publishing ? 'is-loading' : log === '发布完成（草稿）' ? 'is-success' : 'is-error'}`}>
+            {log}
+          </p>
+        )}
 
         {results.length > 0 && (
           <ul className="result-list">

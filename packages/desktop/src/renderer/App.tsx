@@ -79,7 +79,7 @@ export default function App() {
     >
       {hasChrome && (
         <header className="titlebar" aria-label="窗口标题栏">
-          <span className="titlebar-mark" aria-hidden="true">紙</span>
+          <span className="titlebar-mark" aria-hidden="true">R</span>
           <span className="titlebar-title">Research Publish</span>
         </header>
       )}

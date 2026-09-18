@@ -20,9 +20,9 @@ export function ReviewPage({ article, onChange, onNext }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <div className="card" style={{ marginBottom: 16, padding: '16px 20px' }}>
-        <div className="card-header" style={{ alignItems: 'center', marginBottom: 0 }}>
+    <form className="review-page" onSubmit={onSubmit}>
+      <div className="review-toolbar">
+        <div className="card-header">
           <div>
             <p className="card-subtitle" style={{ marginTop: 0 }}>文稿审阅</p>
             <h2 className="card-title">{characterCount} 个正文字符</h2>
@@ -38,12 +38,12 @@ export function ReviewPage({ article, onChange, onNext }: Props) {
         )}
       </div>
 
-      <div className="review-grid">
-        <section className="card" aria-label="文稿编辑">
+      <div className="review-workspace">
+        <section className="editor-pane" aria-label="文稿编辑">
           <div className="card-header">
             <div>
               <h2 className="card-title">编辑内容</h2>
-              <p className="card-subtitle">标题和 Markdown 会即时同步至右侧预览。</p>
+              <p className="card-subtitle">标题和 Markdown 会即时同步至预览。</p>
             </div>
           </div>
 
@@ -67,17 +67,17 @@ export function ReviewPage({ article, onChange, onNext }: Props) {
           </div>
         </section>
 
-        <section className="card" aria-label="文稿预览">
+        <section className="preview-pane" aria-label="文稿预览">
           <div className="card-header">
             <div>
-              <h2 className="card-title">纸面预览</h2>
+              <h2 className="card-title">实时预览</h2>
               <p className="card-subtitle">{article.title.trim() || '尚未填写标题'}</p>
             </div>
           </div>
           {article.markdown.trim() ? (
             <div className="preview" dangerouslySetInnerHTML={{ __html: html }} />
           ) : (
-            <div className="preview preview-empty">正文为空时，这里保持空白纸面。</div>
+            <div className="preview preview-empty">正文为空时，预览将在这里显示。</div>
           )}
         </section>
       </div>

@@ -1,6 +1,6 @@
 import type { AppStep, ServiceRequestPhase, WorkflowArticle } from '../workflow'
 import { getServiceStatusView, getWorkflowSteps } from '../workflow'
-import { IconCpu, IconLock, IconPlug, IconPublish, IconResearch, IconReview } from './Icons'
+import { IconCheck, IconCpu, IconLock, IconPlug, IconPublish, IconResearch, IconReview } from './Icons'
 
 export interface WorkflowSidebarProps {
   currentStep: AppStep
@@ -49,16 +49,16 @@ export function WorkflowSidebar({
   )
 
   return (
-    <aside className="sidebar">
+    <aside className="workflow-sidebar">
       <div className="brand">
         <div className="brand-mark">
-          <span className="brand-logo" aria-hidden="true">紙</span>
+          <span className="brand-logo" aria-hidden="true">R</span>
           <div className="brand-copy">
             <span className="brand-name">Research Publish</span>
-            <span className="brand-sub">研究 · 审阅 · 发稿</span>
+            <span className="brand-sub">研究 · 审阅 · 发布</span>
           </div>
         </div>
-        <span className="tag brush">工作台</span>
+        <span className="workspace-label">工作台</span>
       </div>
 
       <nav className="step-nav" aria-label="工作流步骤">
@@ -77,7 +77,9 @@ export function WorkflowSidebar({
               aria-current={step.state === 'active' ? 'step' : undefined}
               aria-describedby={isLocked ? descriptionId : undefined}
             >
-              <span className="step-index">{step.index}</span>
+              <span className="step-index">
+                {step.state === 'complete' ? <><IconCheck /><span className="sr-only">已完成</span></> : step.index}
+              </span>
               <span className="step-copy">
                 <span className="step-title">
                   <Icon size={14} />
