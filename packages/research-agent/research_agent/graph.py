@@ -10,7 +10,7 @@ from research_agent.prompts import RESEARCH_WORKFLOW_INSTRUCTIONS
 from research_agent.tools import tavily_search
 
 
-def _chat_model() -> ChatOpenAI:
+def chat_model_kwargs() -> dict:
     base_url = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com/v1")
     kwargs: dict = {
         "model": os.getenv("OPENAI_MODEL", "deepseek-chat"),
@@ -19,11 +19,16 @@ def _chat_model() -> ChatOpenAI:
         "temperature": 0.0,
         "timeout": float(os.getenv("RESEARCH_LLM_TIMEOUT", "600")),
         "max_retries": int(os.getenv("RESEARCH_LLM_RETRIES", "1")),
+        "streaming": True,
     }
-    disable_thinking = os.getenv("RESEARCH_DISABLE_THINKING", "1") != "0"
-    if disable_thinking and ("volces.com" in base_url or "ark.cn" in base_url):
-        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
-    return ChatOpenAI(**kwargs)
+    disable_thinking = os.getenv("RESEARCH_DISABLE_THINKING", "0") == "1"
+    if "volces.com" in base_url or "ark.cn" in base_url:
+        kwargs["extra_body"] = {"thinking": {"type": "disabled" if disable_thinking else "enabled"}}
+    return kwargs
+
+
+def _chat_model() -> ChatOpenAI:
+    return ChatOpenAI(**chat_model_kwargs())
 
 
 def create_research_agent():

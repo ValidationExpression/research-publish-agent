@@ -9,8 +9,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
     ipcRenderer.invoke('publish-fetch', path, init),
   researchFetch: (path: string, init?: { method?: string; body?: string }) =>
     ipcRenderer.invoke('research-fetch', path, init),
-  onResearchSseEvent: (cb: (data: { jobId: string; type: string; message: string }) => void) => {
-    const handler = (_: unknown, data: { jobId: string; type: string; message: string }) => cb(data)
+  onResearchSseEvent: (cb: (data: ResearchSsePayload) => void) => {
+    const handler = (_: unknown, data: ResearchSsePayload) => cb(data)
     ipcRenderer.on('research-sse-event', handler)
     return () => ipcRenderer.removeListener('research-sse-event', handler)
   },
@@ -27,6 +27,17 @@ contextBridge.exposeInMainWorld('desktopApi', {
   startResearchSse: (jobId: string) => ipcRenderer.invoke('research-sse', jobId),
 })
 
+type ResearchSsePayload = {
+  jobId: string
+  type: string
+  message?: string
+  id?: string
+  query?: string
+  status?: 'running' | 'done' | 'error'
+  sources?: { title: string; url: string }[]
+  elapsed?: number
+}
+
 export type DesktopApi = {
   platform: string
   titleBarHeight: number
@@ -34,7 +45,16 @@ export type DesktopApi = {
   getServiceStatus: () => Promise<unknown>
   publishFetch: (path: string, init?: { method?: string; body?: string }) => Promise<{ ok: boolean; status: number; data: unknown }>
   researchFetch: (path: string, init?: { method?: string; body?: string }) => Promise<{ ok: boolean; status: number; data: unknown }>
-  onResearchSseEvent: (cb: (data: { jobId: string; type: string; message: string }) => void) => () => void
+  onResearchSseEvent: (cb: (data: {
+    jobId: string
+    type: string
+    message?: string
+    id?: string
+    query?: string
+    status?: 'running' | 'done' | 'error'
+    sources?: { title: string; url: string }[]
+    elapsed?: number
+  }) => void) => () => void
   onResearchSseError: (cb: (data: { jobId: string; error: string }) => void) => () => void
   onResearchSseEnd: (cb: (data: { jobId: string }) => void) => () => void
   startResearchSse: (jobId: string) => Promise<void>

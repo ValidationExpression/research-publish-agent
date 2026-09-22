@@ -112,6 +112,35 @@ class TestTavilySearchResilience(unittest.TestCase):
         finally:
             unbind_job(tokens)
 
+    def test_search_emits_sources_without_page_text(self) -> None:
+        from research_agent.progress import bind_job, unbind_job
+        from research_agent.tools import tavily_search
+
+        events: list[dict] = []
+        tokens = bind_job(lambda *_: None, lambda: False, budget=2, payload=events.append)
+        try:
+            with patch(
+                "research_agent.tools.search_with_retry",
+                return_value={
+                    "results": [
+                        {
+                            "title": "LangGraph",
+                            "url": "https://example.com/lg",
+                            "content": "很长的网页正文",
+                        }
+                    ]
+                },
+            ):
+                tavily_search.func("agent frameworks")
+        finally:
+            unbind_job(tokens)
+        done = [event for event in events if event.get("status") == "done"]
+        self.assertEqual(len(done), 1)
+        self.assertEqual(done[0]["query"], "agent frameworks")
+        self.assertEqual(done[0]["sources"], [{"title": "LangGraph", "url": "https://example.com/lg"}])
+        self.assertNotIn("很长的网页正文", str(done[0]))
+        self.assertTrue(any(event.get("status") == "running" for event in events))
+
     def test_tavily_returns_budget_message_without_calling_api(self) -> None:
         from research_agent.progress import bind_job, unbind_job
         from research_agent.tools import tavily_search

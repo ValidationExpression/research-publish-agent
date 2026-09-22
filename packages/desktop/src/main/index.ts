@@ -150,9 +150,33 @@ function flushSseBuffer(
   }
 }
 
+function isClosedSocket(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : undefined
+  const code = cause && typeof cause === 'object' && 'code' in cause
+    ? String((cause as { code: unknown }).code)
+    : ''
+  return code === 'UND_ERR_SOCKET' || (error instanceof TypeError && error.message === 'fetch failed')
+}
+
+async function fetchResearchEvents(url: string): Promise<Response> {
+  try {
+    return await fetch(url)
+  } catch (error) {
+    // The POST that created the job can leave a keep-alive socket the server already closed.
+    if (!isClosedSocket(error)) throw error
+    return await fetch(url)
+  }
+}
+
 ipcMain.handle('research-sse', async (event, jobId: string) => {
   const url = `http://127.0.0.1:${config.researchHttpPort}/research/${jobId}/events?token=${config.researchToken}`
-  const res = await fetch(url)
+  let res: Response
+  try {
+    res = await fetchResearchEvents(url)
+  } catch (error) {
+    event.sender.send('research-sse-error', { jobId, error: String(error) })
+    return
+  }
   if (!res.ok || !res.body) {
     event.sender.send('research-sse-error', { jobId, error: `SSE failed: ${res.status}` })
     return

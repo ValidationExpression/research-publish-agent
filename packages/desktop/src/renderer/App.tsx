@@ -31,6 +31,7 @@ const PAGE_META = {
 
 export default function App() {
   const [step, setStep] = useState<AppStep>('research')
+  const [researchThread, setResearchThread] = useState(false)
   const [publishConnected, setPublishConnected] = useState(false)
   const [researchOk, setResearchOk] = useState(false)
   const [serviceStatusPhase, setServiceStatusPhase] = useState<ServiceRequestPhase>('loading')
@@ -96,9 +97,9 @@ export default function App() {
         />
 
       <div className="main-panel">
-        <PageHeader {...PAGE_META[step]} />
+        {!(step === 'research' && researchThread) && <PageHeader {...PAGE_META[step]} />}
 
-        <main className="content">
+        <main className={`content${step === 'research' && researchThread ? ' content-chat' : ''}`}>
           {hasResolvedServiceStatus && !publishConnected && (
             <div className="onboarding-banner" role="status">
               <div>
@@ -112,7 +113,9 @@ export default function App() {
             </div>
           )}
 
-          {step === 'research' && <ResearchPage onComplete={goReview} />}
+          <div className="research-slot" hidden={step !== 'research'}>
+            <ResearchPage onSendToReview={goReview} onThreadChange={setResearchThread} />
+          </div>
           {step === 'review' && (
             <ReviewPage
               article={article}

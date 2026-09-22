@@ -10,6 +10,7 @@ import os
 import socket
 import ssl
 import time
+import uuid
 from typing import Any
 
 import httpx
@@ -22,7 +23,8 @@ from tavily import TavilyClient
 from tavily.errors import TimeoutError as TavilyTimeoutError
 from typing_extensions import Annotated, Literal
 
-from research_agent.progress import consume_search, emit_progress, job_cancelled
+from research_agent.progress import consume_search, emit_event, emit_progress, job_cancelled
+from research_agent.stream_events import search_sources
 
 SEARCH_RETRIES = 3
 SEARCH_TIMEOUT = float(os.getenv("TAVILY_TIMEOUT", "20"))
@@ -189,12 +191,18 @@ def tavily_search(
     if job_cancelled():
         return "任务已取消，停止搜索。"
     if not consume_search():
-        emit_progress("writing", "检索次数已达上限，开始整理报告…")
         return (
-            "搜索额度已用完。请立即根据已有资料撰写完整最终报告，"
-            "不要再调用 tavily_search。"
+            "搜索额度已用完。请立即根据已有资料写下研究笔记，"
+            "不要再调用 tavily_search，也不要撰写最终报告。"
         )
-    emit_progress("searching", f"正在检索：{query}")
+    search_id = uuid.uuid4().hex[:8]
+    emit_event({
+        "type": "search",
+        "id": search_id,
+        "query": query,
+        "status": "running",
+        "message": query,
+    })
     try:
         search_results = search_with_retry(
             tavily_client,
@@ -209,7 +217,22 @@ def tavily_search(
             except Exception:
                 pass
             tavily_client = make_tavily_client()
+        emit_event({
+            "type": "search",
+            "id": search_id,
+            "query": query,
+            "status": "error",
+            "message": query,
+        })
         return friendly_search_error(exc)
+    emit_event({
+        "type": "search",
+        "id": search_id,
+        "query": query,
+        "status": "done",
+        "sources": search_sources(search_results),
+        "message": query,
+    })
 
     # Fetch full content for each URL
     result_texts = []

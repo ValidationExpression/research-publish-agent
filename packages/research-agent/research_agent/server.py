@@ -11,12 +11,12 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 def _find_repo_root() -> Path:
@@ -37,16 +37,26 @@ JOB_TIMEOUT_SECONDS = int(os.getenv("RESEARCH_JOB_TIMEOUT", "0"))
 SEARCH_BUDGET = int(os.getenv("RESEARCH_SEARCH_BUDGET", "4"))
 
 
+class HistoryTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = ""
+
+
 class ResearchRequest(BaseModel):
     topic: str
+    history: list[HistoryTurn] = Field(default_factory=list)
+
+
+EPHEMERAL_EVENT_TYPES = {"thinking", "report"}
 
 
 @dataclass
 class JobState:
     job_id: str
     topic: str
+    history: list[dict[str, str]] = field(default_factory=list)
     status: str = "running"
-    events: list[dict[str, str]] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
     report_path: Path | None = None
     title: str = ""
     markdown: str = ""
@@ -67,11 +77,16 @@ def _auth_ok(request: Request) -> bool:
     return token == RESEARCH_TOKEN
 
 
-def _emit(job: JobState, event_type: str, message: str) -> None:
-    payload = {"type": event_type, "message": message}
-    job.events.append(payload)
-    for q in list(job.subscribers):
-        q.put_nowait(payload)
+def _emit(job: JobState, event_type: str, message: str = "", *, durable: bool | None = None, **extra: Any) -> None:
+    payload: dict[str, Any] = {"type": event_type, "message": message, **extra}
+    if durable is None:
+        durable = event_type not in EPHEMERAL_EVENT_TYPES
+    if event_type in EPHEMERAL_EVENT_TYPES:
+        durable = False
+    if durable:
+        job.events.append(payload)
+    for subscriber in list(job.subscribers):
+        subscriber.put_nowait(payload)
 
 
 def _as_text(value: Any) -> str:
@@ -134,24 +149,157 @@ def _extract_report_from_result(result: Any) -> str:
     return ""
 
 
-async def _run_job(job: JobState) -> None:
+def _save_report(job: JobState, title: str, markdown: str) -> None:
+    job.title = title
+    job.markdown = markdown
+    report_path = DATA_DIR / f"{job.job_id}.md"
+    report_path.write_text(markdown, encoding="utf-8")
+    job.report_path = report_path
+    meta_path = DATA_DIR / f"{job.job_id}.json"
+    meta_path.write_text(
+        json.dumps(
+            {
+                "jobId": job.job_id,
+                "topic": job.topic,
+                "title": title,
+                "reportPath": str(report_path),
+                "completedAt": datetime.now(timezone.utc).isoformat(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _research_inputs(job: JobState) -> dict[str, Any]:
+    from research_agent.stream_events import agent_messages
+
+    return {"messages": agent_messages(job.topic, job.history)}
+
+
+async def _stream_research(agent: Any, job: JobState, coalescer: Any) -> str:
+    from research_agent.stream_events import chunk_parts, notes_from_output
+
+    notes = ""
+    async for event in agent.astream_events(
+        _research_inputs(job),
+        version="v2",
+        config={"recursion_limit": 40},
+    ):
+        if job.cancel_flag:
+            break
+        name = event.get("event")
+        data = event.get("data") or {}
+        if name == "on_chat_model_stream":
+            thinking, text = chunk_parts(data.get("chunk"))
+            if thinking:
+                coalescer.add("thinking", thinking)
+            if text:
+                coalescer.add("thinking", text)
+        elif name == "on_chain_end":
+            extracted = notes_from_output(data.get("output"))
+            if extracted:
+                notes = extracted
+    coalescer.flush()
+    return notes
+
+
+async def _write_report(job: JobState, notes: str, coalescer: Any) -> str:
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+    from langchain_openai import ChatOpenAI
+
+    from research_agent.graph import chat_model_kwargs
+    from research_agent.prompts import REPORT_WRITER_INSTRUCTIONS
+    from research_agent.stream_events import chunk_parts
+
+    messages: list[Any] = [SystemMessage(content=REPORT_WRITER_INSTRUCTIONS)]
+    for turn in job.history:
+        content = turn["content"]
+        if turn["role"] == "assistant":
+            messages.append(AIMessage(content=content))
+        else:
+            messages.append(HumanMessage(content=content))
+    messages.append(HumanMessage(content=(
+        f"研究主题：{job.topic}\n\n"
+        f"研究笔记：\n{notes or '（没有检索到可用笔记）'}\n\n"
+        "请输出完整的 Markdown 研究报告。"
+    )))
+    _emit(job, "phase", "writing")
+    model = ChatOpenAI(**chat_model_kwargs())
+    parts: list[str] = []
+    try:
+        async for chunk in model.astream(messages):
+            if job.cancel_flag:
+                break
+            thinking, text = chunk_parts(chunk)
+            if thinking:
+                coalescer.add("thinking", thinking)
+            if text:
+                parts.append(text)
+                coalescer.add("report", text)
+        coalescer.flush()
+    except Exception:
+        coalescer.flush()
+        if not parts:
+            result = await asyncio.to_thread(model.invoke, messages)
+            text = _as_text(getattr(result, "content", result)).strip()
+            if text:
+                parts.append(text)
+                _emit(job, "report", text)
+    return "".join(parts).strip()
+
+
+async def _research_then_write(job: JobState, coalescer: Any) -> None:
     from research_agent.graph import create_research_agent
+    from research_agent.stream_events import notes_from_output
+
+    agent = create_research_agent()
+    inputs = _research_inputs(job)
+    try:
+        notes = await _stream_research(agent, job, coalescer)
+    except Exception:
+        coalescer.flush()
+        result = await asyncio.to_thread(agent.invoke, inputs, {"recursion_limit": 40})
+        notes = notes_from_output(result)
+    if job.cancel_flag:
+        job.status = "cancelled"
+        _emit(job, "error", "任务已取消")
+        return
+    markdown = await _write_report(job, notes, coalescer)
+    if job.cancel_flag:
+        job.status = "cancelled"
+        _emit(job, "error", "任务已取消")
+        return
+    if not markdown.strip():
+        raise RuntimeError("研究报告为空")
+    title, report = _extract_title_and_markdown(markdown, job.topic)
+    _save_report(job, title, report)
+    job.status = "completed"
+    _emit(job, "done", "研究报告已生成")
+
+
+async def _run_job(job: JobState) -> None:
     from research_agent.progress import bind_job, unbind_job
+    from research_agent.stream_events import TokenCoalescer
 
     heartbeat: asyncio.Task | None = None
+    flush_loop: asyncio.Task | None = None
     hooks = None
     try:
-        _emit(job, "planning", "正在规划研究任务…")
-        agent = create_research_agent()
-        if job.cancel_flag:
-            job.status = "cancelled"
-            _emit(job, "error", "任务已取消")
-            return
-
+        _emit(job, "planning", "正在理解问题并规划检索…")
+        coalescer = TokenCoalescer(lambda kind, text: _emit(job, kind, text))
+        flush_loop = asyncio.create_task(coalescer.loop())
         hooks = bind_job(
             lambda event_type, message: _emit(job, event_type, message),
             lambda: job.cancel_flag,
             budget=SEARCH_BUDGET,
+            payload=lambda payload: _emit(
+                job,
+                str(payload.get("type") or "progress"),
+                str(payload.get("message") or ""),
+                **{key: value for key, value in payload.items() if key not in ("type", "message")},
+            ),
         )
 
         async def _heartbeat() -> None:
@@ -161,60 +309,18 @@ async def _run_job(job: JobState) -> None:
                 elapsed += 15
                 if job.status != "running" or job.cancel_flag:
                     return
-                phase = job.events[-1]["type"] if job.events else "searching"
-                if phase == "writing":
-                    _emit(job, "writing", f"仍在整理报告… 已用时 {elapsed} 秒")
-                else:
-                    _emit(job, "searching", f"仍在研究中… 已用时 {elapsed} 秒")
+                _emit(job, "heartbeat", f"已用时 {elapsed} 秒", durable=False, elapsed=elapsed)
 
         heartbeat = asyncio.create_task(_heartbeat())
-        _emit(job, "searching", "正在搜索与收集资料…")
-        invoke_coro = asyncio.to_thread(
-            agent.invoke,
-            {"messages": [{"role": "user", "content": job.topic}]},
-            {"recursion_limit": 40},
-        )
-        if JOB_TIMEOUT_SECONDS > 0:
-            result = await asyncio.wait_for(invoke_coro, timeout=JOB_TIMEOUT_SECONDS)
-        else:
-            result = await invoke_coro
-
         if job.cancel_flag:
             job.status = "cancelled"
             _emit(job, "error", "任务已取消")
             return
-
-        if heartbeat is not None:
-            heartbeat.cancel()
-            heartbeat = None
-
-        _emit(job, "writing", "正在整理研究报告…")
-        final_text = _extract_report_from_result(result)
-        title, markdown = _extract_title_and_markdown(final_text, job.topic)
-        job.title = title
-        job.markdown = markdown
-
-        report_path = DATA_DIR / f"{job.job_id}.md"
-        report_path.write_text(markdown, encoding="utf-8")
-        job.report_path = report_path
-        meta_path = DATA_DIR / f"{job.job_id}.json"
-        meta_path.write_text(
-            json.dumps(
-                {
-                    "jobId": job.job_id,
-                    "topic": job.topic,
-                    "title": title,
-                    "reportPath": str(report_path),
-                    "completedAt": datetime.now(timezone.utc).isoformat(),
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-        job.status = "completed"
-        _emit(job, "done", "研究报告已生成")
+        work = _research_then_write(job, coalescer)
+        if JOB_TIMEOUT_SECONDS > 0:
+            await asyncio.wait_for(work, timeout=JOB_TIMEOUT_SECONDS)
+        else:
+            await work
     except TimeoutError:
         job.error = f"研究超时（超过 {JOB_TIMEOUT_SECONDS} 秒）。请缩小主题后重试。"
         _emit(job, "error", job.error)
@@ -227,8 +333,14 @@ async def _run_job(job: JobState) -> None:
         _emit(job, "error", job.error)
         job.status = "failed"
     finally:
-        if heartbeat is not None:
-            heartbeat.cancel()
+        for task in (heartbeat, flush_loop):
+            if task is None:
+                continue
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         if hooks is not None:
             unbind_job(hooks)
 
@@ -240,8 +352,10 @@ async def create_research(body: ResearchRequest, request: Request):
     if not body.topic.strip():
         raise HTTPException(400, "topic required")
 
+    from research_agent.stream_events import normalize_history
+
     job_id = f"job_{uuid.uuid4().hex[:12]}"
-    job = JobState(job_id=job_id, topic=body.topic.strip())
+    job = JobState(job_id=job_id, topic=body.topic.strip(), history=normalize_history(body.history))
     jobs[job_id] = job
     asyncio.create_task(_run_job(job))
     return {"jobId": job_id}
@@ -258,22 +372,32 @@ async def research_events(job_id: str, request: Request):
     async def event_stream() -> AsyncIterator[str]:
         queue: asyncio.Queue = asyncio.Queue()
         job.subscribers.append(queue)
-        sent = 0
+        seen: set[int] = set()
+
+        def encode(event: dict[str, Any]) -> str:
+            return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
         try:
-            while True:
-                if sent < len(job.events):
-                    for ev in job.events[sent:]:
-                        yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-                    sent = len(job.events)
+            for event in list(job.events):
+                if id(event) in seen:
                     continue
-                if job.status in ("completed", "failed", "cancelled"):
+                seen.add(id(event))
+                yield encode(event)
+            while True:
+                terminal = job.status in ("completed", "failed", "cancelled")
+                if terminal and queue.empty():
                     break
                 try:
-                    ev = await asyncio.wait_for(queue.get(), timeout=1.0)
-                    yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-                    sent = len(job.events)
+                    event = await asyncio.wait_for(queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
+                    if job.status in ("completed", "failed", "cancelled") and queue.empty():
+                        break
                     yield ": keepalive\n\n"
+                    continue
+                if id(event) in seen:
+                    continue
+                seen.add(id(event))
+                yield encode(event)
         finally:
             if queue in job.subscribers:
                 job.subscribers.remove(queue)

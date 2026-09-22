@@ -23,7 +23,7 @@ function installDevPreviewApi(): void {
   }
   const delay = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 
-  let onEvent: ((data: { jobId: string; type: string; message: string }) => void) | undefined
+  let onEvent: ((data: { jobId: string; type: string; message?: string; id?: string; query?: string; status?: 'running' | 'done' | 'error'; sources?: { title: string; url: string }[]; elapsed?: number }) => void) | undefined
 
   window.desktopApi = {
     platform: 'web',
@@ -76,12 +76,28 @@ function installDevPreviewApi(): void {
     onResearchSseError: () => () => {},
     onResearchSseEnd: () => () => {},
     startResearchSse: async (jobId) => {
+      const push = (event: { type: string; message?: string; id?: string; query?: string; status?: 'running' | 'done' | 'error'; sources?: { title: string; url: string }[]; elapsed?: number }) => {
+        onEvent?.({ jobId, ...event })
+      }
+      push({ type: 'thinking', message: '先比较这些框架各自解决的工程问题，再决定检索哪些对比。' })
+      await delay(350)
+      push({ type: 'search', id: 's1', query: '2026 AI Agent framework comparison', status: 'running', message: '2026 AI Agent framework comparison' })
       await delay(400)
-      onEvent?.({ jobId, type: 'progress', message: '正在检索可信资料…' })
-      await delay(650)
-      onEvent?.({ jobId, type: 'progress', message: '正在归纳框架差异与工程取舍…' })
-      await delay(700)
-      onEvent?.({ jobId, type: 'done', message: '报告已生成' })
+      push({
+        type: 'search',
+        id: 's1',
+        query: '2026 AI Agent framework comparison',
+        status: 'done',
+        message: '2026 AI Agent framework comparison',
+        sources: [{ title: 'LangGraph docs', url: 'https://example.com/langgraph' }],
+      })
+      await delay(250)
+      push({ type: 'phase', message: 'writing' })
+      push({ type: 'report', message: sample.markdown.slice(0, 48) })
+      await delay(250)
+      push({ type: 'report', message: sample.markdown.slice(48) })
+      await delay(200)
+      push({ type: 'done', message: '研究报告已生成' })
     },
   }
 }
