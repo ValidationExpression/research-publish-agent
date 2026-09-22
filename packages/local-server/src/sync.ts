@@ -102,9 +102,9 @@ export class SyncManager {
         // 的平台如 CSDN 由预处理转换而来），保证 markdowncontent 不为空
         const payload: any = {
           title: article.title,
-          html: cleaned.html,
+          html: cleaned.html || rawHtml,
           markdown: article.markdown || cleaned.markdown,
-          content: cleaned.html,
+          content: cleaned.html || rawHtml,
           cover: article.cover,
         }
         const result: any = await adapter.publish(payload, {

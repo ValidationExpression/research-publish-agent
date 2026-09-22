@@ -4,9 +4,15 @@
 import { CodeAdapter, type ImageUploadResult } from '../code-adapter'
 import type { Article, AuthResult, SyncResult, PlatformMeta } from '../../types'
 import type { PublishOptions } from '../types'
-import { createLogger } from '../../lib/logger'
+import { createLogger, markdownToHtml } from '../../lib'
 
 const logger = createLogger('CSDN')
+
+/** CSDN saveArticle 同时需要 markdown 与 HTML；HTML 为空会返回「请输入内容」。 */
+export function resolveCsdnHtml(markdown: string, html?: string): string {
+  if (html?.trim()) return html
+  return markdown.trim() ? markdownToHtml(markdown) : ''
+}
 
 interface CSDNUserInfo {
   csdnid: string
@@ -205,8 +211,7 @@ export class CSDNAdapter extends CodeAdapter {
         }
       )
 
-      // Get HTML content (CSDN API needs both markdown and HTML)
-      const htmlContent = article.html || ''
+      const htmlContent = resolveCsdnHtml(markdown, article.html)
 
       // Generate signature and save article
       const apiPath = '/blog-console-api/v3/mdeditor/saveArticle'

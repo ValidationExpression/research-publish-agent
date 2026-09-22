@@ -13,6 +13,7 @@
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
     "start": "node dist/index.js",
     "smoke": "node dist/smoke.js",
+    "test": "tsx --test src/preprocess.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

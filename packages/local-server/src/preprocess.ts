@@ -13,10 +13,28 @@ const PRESERVE_TAGS = new Set([
  * 按各平台 preprocessConfig 用 linkedom 清洗 HTML。
  * 目标：产出能被各平台 Web 编辑器接受的干净 HTML（与原 Content Script 预处理等价）。
  * 平台特定的进一步转换由对应 adapter 在 publish 内完成（如知乎 transformContent）。
+ *
+ * linkedom 的 parseHTML 把片段当成整页解析：以 <h1>/<p> 开头时，
+ * 会把该标签当成根节点并插入空的 head/body，正文进不了 document.body。
+ * 先建空文档再赋 innerHTML，按片段解析。
  */
+function parseArticleDocument(rawHtml: string): {
+  documentElement: any
+  body: any
+  querySelectorAll: (s: string) => any[]
+  createElement: (t: string) => any
+} {
+  if (/<(?:html|body)[\s>]/i.test(rawHtml)) {
+    return parseHTML(rawHtml).document as any
+  }
+  const { document } = parseHTML('<!DOCTYPE html><html><head></head><body></body></html>')
+  document.body.innerHTML = rawHtml
+  return document as any
+}
+
 export function preprocessHtml(rawHtml: string, config: PreprocessConfig): string {
   if (!rawHtml) return rawHtml
-  const { document } = parseHTML(rawHtml)
+  const document = parseArticleDocument(rawHtml)
   const doc = document as unknown as {
     documentElement: any
     body: any
