@@ -1,7 +1,7 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import type { ArticleDraft } from '../App'
-import { IconArrowRight, IconGlobe, IconLayers, IconReport } from '../components/Icons'
+import { IconSend } from '../components/Icons'
 import {
   type AssistantMessage,
   type ResearchConversation,
@@ -19,6 +19,8 @@ import {
   parseResearchReport,
   RESEARCH_SUGGESTIONS,
 } from '../research-view-model'
+
+const sendModifier = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
 
 interface Props {
   onSendToReview: (draft: ArticleDraft) => void
@@ -193,8 +195,12 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
         />
         <div className="research-composer-footer">
           <div className="research-composer-meta">
-            <span aria-live="polite">{topic.length} / 2000</span>
-            <span className="research-shortcut">Ctrl / ⌘ + Enter 发送</span>
+            <span className={`research-count${topic.length >= 1800 ? ' is-warn' : ''}`} aria-live="polite">{topic.length} / 2000</span>
+            <span className="research-shortcut" aria-label={`${sendModifier} 加 Enter 发送`}>
+              <kbd className="research-kbd">{sendModifier}</kbd>
+              <span className="research-shortcut-plus" aria-hidden="true">+</span>
+              <kbd className="research-kbd">Enter</kbd>
+            </span>
           </div>
           <div className="research-composer-actions">
             {running && (
@@ -208,7 +214,7 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
               disabled={!canStartResearch(topic, running)}
               aria-label={running ? '研究中' : '开始研究'}
             >
-              {running ? <span className="spinner" aria-hidden="true" /> : <IconArrowRight />}
+              {running ? <span className="spinner" aria-hidden="true" /> : <IconSend />}
             </button>
           </div>
         </div>
@@ -218,7 +224,7 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
 
   if (!threaded) {
     return (
-      <div className="research-chat">
+      <div className="research-chat is-hero">
         {composer}
         <div className="research-suggestions" aria-label="推荐研究主题">
           <span className="research-suggestions-label">试试这些主题</span>
@@ -236,11 +242,6 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
             ))}
           </div>
         </div>
-        <ol className="research-stages" aria-label="研究流程">
-          <li><IconGlobe /><strong>联网检索</strong><span>从公开网页获取相关资料</span></li>
-          <li><IconLayers /><strong>资料分析</strong><span>阅读、筛选并交叉验证</span></li>
-          <li><IconReport /><strong>生成报告</strong><span>输出可继续编辑的 Markdown</span></li>
-        </ol>
       </div>
     )
   }

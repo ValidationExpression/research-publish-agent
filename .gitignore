@@ -14,3 +14,7 @@ uv.lock
 packages/desktop/release/
 packages/research-agent/data/
 userData/
+
+# 本机包缓存与代理调试残留，不入库
+.pnpm-store/
+.superpowers/

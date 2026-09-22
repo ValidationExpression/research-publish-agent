@@ -96,7 +96,7 @@ export default function App() {
           onStepChange={setStep}
         />
 
-      <div className="main-panel">
+      <div className={`main-panel${step === 'research' && !researchThread ? ' is-research-hero' : ''}`}>
         {!(step === 'research' && researchThread) && <PageHeader {...PAGE_META[step]} />}
 
         <main className={`content${step === 'research' && researchThread ? ' content-chat' : ''}`}>
