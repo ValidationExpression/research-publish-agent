@@ -149,6 +149,78 @@ def _extract_report_from_result(result: Any) -> str:
     return ""
 
 
+_JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$")
+
+
+def _saved_report_paths(job_id: str, data_dir: Path) -> tuple[Path, Path]:
+    if not _JOB_ID.fullmatch(job_id):
+        raise HTTPException(400, "invalid job id")
+    root = data_dir.resolve()
+    meta_path = (root / f"{job_id}.json").resolve()
+    report_path = (root / f"{job_id}.md").resolve()
+    if meta_path.parent != root or report_path.parent != root:
+        raise HTTPException(400, "invalid job id")
+    return meta_path, report_path
+
+
+def list_saved_reports(data_dir: Path | None = None) -> list[dict[str, str]]:
+    root = (data_dir or DATA_DIR).resolve()
+    items: list[dict[str, str]] = []
+    if not root.is_dir():
+        return items
+    for meta_path in root.glob("*.json"):
+        job_id = meta_path.stem
+        if not _JOB_ID.fullmatch(job_id):
+            continue
+        if not (root / f"{job_id}.md").is_file():
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(meta, dict):
+            continue
+        items.append(
+            {
+                "jobId": job_id,
+                "title": str(meta.get("title") or meta.get("topic") or job_id),
+                "topic": str(meta.get("topic") or ""),
+                "completedAt": str(meta.get("completedAt") or ""),
+            }
+        )
+    items.sort(key=lambda item: item["completedAt"], reverse=True)
+    return items
+
+
+def read_saved_report(job_id: str, data_dir: Path | None = None) -> dict[str, str]:
+    meta_path, report_path = _saved_report_paths(job_id, data_dir or DATA_DIR)
+    if not meta_path.is_file() or not report_path.is_file():
+        raise HTTPException(404, "not found")
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
+    return {
+        "jobId": job_id,
+        "title": str(meta.get("title") or meta.get("topic") or job_id),
+        "topic": str(meta.get("topic") or ""),
+        "completedAt": str(meta.get("completedAt") or ""),
+        "markdown": report_path.read_text(encoding="utf-8"),
+    }
+
+
+def delete_saved_report(job_id: str, data_dir: Path | None = None) -> None:
+    meta_path, report_path = _saved_report_paths(job_id, data_dir or DATA_DIR)
+    if not meta_path.is_file() and not report_path.is_file():
+        raise HTTPException(404, "not found")
+    if meta_path.is_file():
+        meta_path.unlink()
+    if report_path.is_file():
+        report_path.unlink()
+
+
 def _save_report(job: JobState, title: str, markdown: str) -> None:
     job.title = title
     job.markdown = markdown
@@ -343,6 +415,28 @@ async def _run_job(job: JobState) -> None:
                 pass
         if hooks is not None:
             unbind_job(hooks)
+
+
+@app.get("/research/reports")
+async def research_reports(request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(401, "unauthorized")
+    return {"reports": list_saved_reports()}
+
+
+@app.get("/research/reports/{job_id}")
+async def research_saved_report(job_id: str, request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(401, "unauthorized")
+    return read_saved_report(job_id)
+
+
+@app.delete("/research/reports/{job_id}")
+async def remove_saved_report(job_id: str, request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(401, "unauthorized")
+    delete_saved_report(job_id)
+    return {"ok": True}
 
 
 @app.post("/research")

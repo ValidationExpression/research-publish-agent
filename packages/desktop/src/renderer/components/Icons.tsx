@@ -3,6 +3,25 @@ interface IconProps {
   className?: string
 }
 
+export function IconArchive({ size = 16, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M4.75 8.25h14.5v11a1.25 1.25 0 0 1-1.25 1.25H6A1.25 1.25 0 0 1 4.75 19.25v-11Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M3.75 5.75h16.5v2.5H3.75v-2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M10 12.25h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconDocument({ size = 16, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M7 3.75h7.5L19.25 8.5V20.25H7A1.25 1.25 0 0 1 5.75 19V5A1.25 1.25 0 0 1 7 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M14.25 3.75V8.5h5M9 12.5h6M9 16h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function IconResearch({ size = 16, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">

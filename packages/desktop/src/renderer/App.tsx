@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { ResearchPage } from './pages/ResearchPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { PublishPage } from './pages/PublishPage'
+import { ArchivePage } from './pages/ArchivePage'
 import { PageHeader } from './components/PageHeader'
 import { WorkflowSidebar } from './components/WorkflowSidebar'
-import type { AppStep, ServiceRequestPhase, WorkflowArticle } from './workflow'
+import type { AppStep, ServiceRequestPhase, WorkflowArticle, WorkspaceScreen } from './workflow'
 import { parseServiceStatus } from './workflow'
 
 export type { AppStep } from './workflow'
@@ -30,7 +31,8 @@ const PAGE_META = {
 } satisfies Record<AppStep, { eyebrow: string; title: string; description: string }>
 
 export default function App() {
-  const [step, setStep] = useState<AppStep>('research')
+  const [step, setStep] = useState<WorkspaceScreen>('research')
+  const [archiveRevision, setArchiveRevision] = useState(0)
   const [researchThread, setResearchThread] = useState(false)
   const [publishConnected, setPublishConnected] = useState(false)
   const [researchOk, setResearchOk] = useState(false)
@@ -94,12 +96,13 @@ export default function App() {
           hasResolvedServiceStatus={hasResolvedServiceStatus}
           serviceStatusError={serviceStatusError}
           onStepChange={setStep}
+          onOpenArchive={() => setStep('archive')}
         />
 
       <div className={`main-panel${step === 'research' && !researchThread ? ' is-research-hero' : ''}`}>
-        {!(step === 'research' && researchThread) && <PageHeader {...PAGE_META[step]} />}
+        {step !== 'archive' && !(step === 'research' && researchThread) && <PageHeader {...PAGE_META[step]} />}
 
-        <main className={`content${step === 'research' && researchThread ? ' content-chat' : ''}`}>
+        <main className={`content${step === 'research' && researchThread ? ' content-chat' : ''}${step === 'archive' ? ' content-archive' : ''}`}>
           {hasResolvedServiceStatus && !publishConnected && (
             <div className="onboarding-banner" role="status">
               <div>
@@ -114,8 +117,15 @@ export default function App() {
           )}
 
           <div className="research-slot" hidden={step !== 'research'}>
-            <ResearchPage onSendToReview={goReview} onThreadChange={setResearchThread} />
+            <ResearchPage
+              onSendToReview={goReview}
+              onThreadChange={setResearchThread}
+              onReportReady={() => setArchiveRevision((current) => current + 1)}
+            />
           </div>
+          {step === 'archive' && (
+            <ArchivePage revision={archiveRevision} onSendToReview={goReview} />
+          )}
           {step === 'review' && (
             <ReviewPage
               article={article}

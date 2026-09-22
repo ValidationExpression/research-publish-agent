@@ -1,4 +1,5 @@
 export type AppStep = 'research' | 'review' | 'publish'
+export type WorkspaceScreen = AppStep | 'archive'
 export type WorkflowState = 'active' | 'complete' | 'available' | 'locked'
 export type ServiceRequestPhase = 'idle' | 'loading' | 'success' | 'error'
 export type ServiceName = 'publish' | 'research'
@@ -49,17 +50,18 @@ const STEP_COPY: Omit<WorkflowStepView, 'state'>[] = [
   { id: 'publish', index: '03', title: '发布', description: '同步草稿到各平台' },
 ]
 
-export function getWorkflowSteps(current: AppStep, article: WorkflowArticle): WorkflowStepView[] {
-  const currentIndex = STEP_COPY.findIndex(({ id }) => id === current)
+export function getWorkflowSteps(current: WorkspaceScreen, article: WorkflowArticle): WorkflowStepView[] {
+  const workflowCurrent = current === 'archive' ? null : current
+  const currentIndex = workflowCurrent ? STEP_COPY.findIndex(({ id }) => id === workflowCurrent) : -1
   const unlocked = new Set<AppStep>(['research'])
   if (article.markdown.trim()) unlocked.add('review')
   if (article.title.trim() && article.markdown.trim()) unlocked.add('publish')
 
   return STEP_COPY.map((step, index) => ({
     ...step,
-    state: step.id === current
+    state: step.id === workflowCurrent
       ? 'active'
-      : index < currentIndex
+      : workflowCurrent && index < currentIndex
         ? 'complete'
         : unlocked.has(step.id)
           ? 'available'

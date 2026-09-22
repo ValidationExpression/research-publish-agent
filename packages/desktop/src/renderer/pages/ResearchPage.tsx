@@ -1,7 +1,8 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import type { ArticleDraft } from '../App'
-import { IconSend } from '../components/Icons'
+import { DocumentReader, formatDocumentTime } from '../components/DocumentReader'
+import { IconDocument, IconSend } from '../components/Icons'
 import {
   type AssistantMessage,
   type ResearchConversation,
@@ -25,9 +26,10 @@ const sendModifier = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(
 interface Props {
   onSendToReview: (draft: ArticleDraft) => void
   onThreadChange: (active: boolean) => void
+  onReportReady?: () => void
 }
 
-export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
+export function ResearchPage({ onSendToReview, onThreadChange, onReportReady }: Props) {
   const [conversation, setConversation] = useState<ResearchConversation>(() => createConversation())
   const [topic, setTopic] = useState('')
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean | undefined>>({})
@@ -35,6 +37,7 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
   const expectingJobRef = useRef<string | null>(null)
   const pollingRef = useRef<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
+  const [readingId, setReadingId] = useState<string | null>(null)
   const running = isResearchRunning(conversation)
   const threaded = conversation.messages.length > 0
 
@@ -72,6 +75,7 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
       const report = res.ok ? parseResearchReport(res.data) : null
       if (!report) return false
       setConversation((current) => finalizeReport(claimExpectedJob(current, id, expectingJobRef.current), id, report))
+      onReportReady?.()
       return true
     } catch {
       return false
@@ -164,6 +168,7 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
     setConversation(createConversation())
     setTopic('')
     setExpandedThinking({})
+    setReadingId(null)
   }
 
   function onSubmit(event: FormEvent) {
@@ -246,34 +251,59 @@ export function ResearchPage({ onSendToReview, onThreadChange }: Props) {
     )
   }
 
+  const reading = conversation.messages.find((message) => message.id === readingId && message.role === 'assistant' && message.phase === 'done')
+  const readingArticle = reading && reading.role === 'assistant' ? articleFromAssistant(reading) : null
+  const readingTopic = reading ? topicBefore(conversation.messages, reading.id) : ''
+
   return (
-    <div className="research-chat is-thread">
-      <div className="research-thread-bar">
-        <p className="research-thread-title">研究对话</p>
-        <button type="button" className="btn btn-ghost" onClick={newConversation} disabled={running}>
-          新对话
-        </button>
+    <div className={`research-chat is-thread${readingArticle ? ' is-reading' : ''}`}>
+      <div className="research-thread-column">
+        <div className="research-thread-bar">
+          <p className="research-thread-title">研究对话</p>
+          <button type="button" className="btn btn-ghost" onClick={newConversation} disabled={running}>
+            新对话
+          </button>
+        </div>
+        <div className="research-thread" role="log" aria-live="polite" aria-relevant="additions" ref={threadRef}>
+          {conversation.messages.map((message) => (
+            message.role === 'user' ? (
+              <article key={message.id} className="chat-turn is-user">
+                <p>{message.content}</p>
+              </article>
+            ) : (
+              <AssistantTurn
+                key={message.id}
+                message={message}
+                thinkingOpen={expandedThinking[message.id]}
+                onThinkingOpen={(open) => setExpandedThinking((current) => ({ ...current, [message.id]: open }))}
+                onOpen={() => setReadingId(message.id)}
+              />
+            )
+          ))}
+        </div>
+        {composer}
       </div>
-      <div className="research-thread" role="log" aria-live="polite" aria-relevant="additions" ref={threadRef}>
-        {conversation.messages.map((message) => (
-          message.role === 'user' ? (
-            <article key={message.id} className="chat-turn is-user">
-              <p>{message.content}</p>
-            </article>
-          ) : (
-            <AssistantTurn
-              key={message.id}
-              message={message}
-              thinkingOpen={expandedThinking[message.id]}
-              onThinkingOpen={(open) => setExpandedThinking((current) => ({ ...current, [message.id]: open }))}
-              onSendToReview={onSendToReview}
-            />
-          )
-        ))}
-      </div>
-      {composer}
+      {reading && reading.role === 'assistant' && readingArticle && (
+        <DocumentReader
+          title={readingArticle.title}
+          topic={readingTopic}
+          completedAt={reading.completedAt}
+          markdown={readingArticle.markdown}
+          onClose={() => setReadingId(null)}
+          onSendToReview={() => onSendToReview(readingArticle)}
+        />
+      )}
     </div>
   )
+}
+
+function topicBefore(messages: ResearchConversation['messages'], assistantId: string): string {
+  const index = messages.findIndex((message) => message.id === assistantId)
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const message = messages[i]
+    if (message?.role === 'user' && message.content.trim()) return message.content.trim()
+  }
+  return ''
 }
 
 function claimExpectedJob(
@@ -302,18 +332,18 @@ function AssistantTurn({
   message,
   thinkingOpen,
   onThinkingOpen,
-  onSendToReview,
+  onOpen,
 }: {
   message: AssistantMessage
   thinkingOpen: boolean | undefined
   onThinkingOpen: (open: boolean) => void
-  onSendToReview: (draft: ArticleDraft) => void
+  onOpen: () => void
 }) {
   const autoOpen = message.phase === 'thinking' && message.searches.length === 0
   const open = thinkingOpen ?? autoOpen
-  const showReport = message.phase === 'writing' || message.phase === 'done' || message.markdown.trim().length > 0
+  const streaming = message.phase === 'writing' || (message.phase !== 'done' && message.markdown.trim().length > 0)
   const article = articleFromAssistant(message)
-  const html = message.markdown.trim() ? marked.parse(message.markdown) as string : ''
+  const html = streaming && message.markdown.trim() ? marked.parse(message.markdown) as string : ''
   const thinkingLabel = message.searches.length > 0 || message.phase === 'writing' || message.phase === 'done'
     ? '已思考'
     : '思考过程'
@@ -366,22 +396,28 @@ function AssistantTurn({
         </section>
       )}
 
-      {showReport && (
+      {streaming && (
         <section className="chat-report" aria-label="研究报告">
           <div className="chat-report-bar">
-            <h3>{message.phase === 'writing' ? '正在整理研究报告' : '研究报告'}</h3>
-            {article && (
-              <button type="button" className="btn btn-primary" onClick={() => onSendToReview(article)}>
-                送审阅
-              </button>
-            )}
+            <h3>正在整理研究报告</h3>
           </div>
           {html ? (
-            <div className={`preview${message.phase === 'writing' ? ' chat-caret' : ''}`} dangerouslySetInnerHTML={{ __html: html }} />
+            <div className="preview chat-caret" dangerouslySetInnerHTML={{ __html: html }} />
           ) : (
             <p className="preview preview-empty chat-caret">正在根据检索结果整理报告…</p>
           )}
         </section>
+      )}
+
+      {article && (
+        <button type="button" className="doc-card" onClick={onOpen}>
+          <IconDocument size={22} />
+          <span className="doc-card-copy">
+            <strong>{article.title}</strong>
+            <span>{formatDocumentTime(message.completedAt) || '刚刚完成'}</span>
+          </span>
+          <span className="doc-card-open">打开</span>
+        </button>
       )}
 
       {message.error && <p className="chat-error" role="alert">{message.error}</p>}

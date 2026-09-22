@@ -1,9 +1,9 @@
-import type { AppStep, ServiceRequestPhase, WorkflowArticle } from '../workflow'
+import type { AppStep, ServiceRequestPhase, WorkflowArticle, WorkspaceScreen } from '../workflow'
 import { getServiceStatusView, getWorkflowSteps } from '../workflow'
-import { IconCheck, IconCpu, IconLock, IconPlug, IconPublish, IconResearch, IconReview } from './Icons'
+import { IconArchive, IconCheck, IconCpu, IconLock, IconPlug, IconPublish, IconResearch, IconReview } from './Icons'
 
 export interface WorkflowSidebarProps {
-  currentStep: AppStep
+  currentStep: WorkspaceScreen
   article: WorkflowArticle
   publishConnected: boolean
   researchOk: boolean
@@ -11,6 +11,7 @@ export interface WorkflowSidebarProps {
   hasResolvedServiceStatus: boolean
   serviceStatusError: string | null
   onStepChange: (step: AppStep) => void
+  onOpenArchive: () => void
 }
 
 const STEP_ICONS = {
@@ -33,6 +34,7 @@ export function WorkflowSidebar({
   hasResolvedServiceStatus,
   serviceStatusError,
   onStepChange,
+  onOpenArchive,
 }: WorkflowSidebarProps) {
   const steps = getWorkflowSteps(currentStep, article)
   const publishStatus = getServiceStatusView(
@@ -94,6 +96,16 @@ export function WorkflowSidebar({
           )
         })}
       </nav>
+
+      <button
+        type="button"
+        className={`archive-nav-item${currentStep === 'archive' ? ' active' : ''}`}
+        aria-current={currentStep === 'archive' ? 'page' : undefined}
+        onClick={onOpenArchive}
+      >
+        <IconArchive size={16} />
+        研究仓库
+      </button>
 
       <div className="sidebar-status" aria-label="服务状态">
         <div className="status-row">

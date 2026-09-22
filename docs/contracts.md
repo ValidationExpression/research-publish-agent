@@ -40,8 +40,13 @@ Default dev tokens: `wechatsync-local` (publish), `research-local` (research).
 |--------|------|-------------|
 | POST | `/research` | `{ "topic": "...", "history"?: [{ "role": "user" \| "assistant", "content": "..." }] }` → `{ "jobId" }` |
 | GET | `/research/:jobId/events` | SSE progress for one research turn |
-| GET | `/research/:jobId/report` | `{ "title", "markdown" }` |
+| GET | `/research/:jobId/report` | `{ "title", "markdown" }` for the in-memory job |
+| GET | `/research/reports` | Finished reports on disk: `{ "reports": [{ "jobId", "title", "topic", "completedAt" }] }` |
+| GET | `/research/reports/:jobId` | One saved report: `{ "jobId", "title", "topic", "completedAt", "markdown" }` |
+| DELETE | `/research/reports/:jobId` | Delete that report's `.json` and `.md` |
 | POST | `/research/:jobId/cancel` | Cancel job |
+
+`GET /research/reports` lists only jobs that have both a metadata file and a Markdown file. It reads the research data directory, so reports remain available after the sidecar restarts. The in-memory `GET /research/:jobId/report` is unchanged.
 
 `history` is prior turns only. The assistant entries are finished report Markdown, without thinking or search logs. Each request still creates one job and one report.
 

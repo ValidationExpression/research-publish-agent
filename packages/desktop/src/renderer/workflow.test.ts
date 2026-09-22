@@ -38,6 +38,19 @@ describe('getWorkflowSteps', () => {
     const steps = getWorkflowSteps('publish', { title: '标题', markdown: '# 报告' })
     expect(steps.map(({ state }) => state)).toEqual(['complete', 'complete', 'active'])
   })
+
+  it('keeps the archive outside the numbered steps', () => {
+    const steps = getWorkflowSteps('archive', { title: '', markdown: '' })
+    expect(steps.map(({ id }) => id)).toEqual(['research', 'review', 'publish'])
+    expect(steps.map(({ state }) => state)).toEqual(['available', 'locked', 'locked'])
+  })
+
+  it('keeps review and publish locks while the archive is open', () => {
+    const withReport = getWorkflowSteps('archive', { title: '标题', markdown: '# 报告' })
+    expect(withReport.map(({ state }) => state)).toEqual(['available', 'available', 'available'])
+    const reviewOnly = getWorkflowSteps('archive', { title: '', markdown: '# 报告' })
+    expect(reviewOnly.map(({ state }) => state)).toEqual(['available', 'available', 'locked'])
+  })
 })
 
 describe('getServiceStatusView', () => {

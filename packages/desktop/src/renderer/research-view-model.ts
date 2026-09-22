@@ -36,6 +36,7 @@ export interface AssistantMessage {
   title: string
   error: string | null
   elapsed: number
+  completedAt?: string
 }
 
 export type ChatMessage = UserMessage | AssistantMessage
@@ -110,6 +111,7 @@ export function finalizeReport(
     title: report.title,
     markdown: report.markdown,
     error: null,
+    completedAt: message.completedAt ?? new Date().toISOString(),
   }))
 }
 
@@ -170,7 +172,9 @@ function reduceAssistant(message: AssistantMessage, event: ResearchSseEvent): As
     if (message.phase !== 'writing' && message.phase !== 'done') return message
     return { ...message, markdown: message.markdown + (event.message || '') }
   }
-  if (event.type === 'done') return { ...message, phase: 'done' }
+  if (event.type === 'done') {
+    return { ...message, phase: 'done', completedAt: message.completedAt ?? new Date().toISOString() }
+  }
   if (event.type === 'error') {
     return { ...message, phase: 'error', error: event.message?.trim() || '研究失败' }
   }
